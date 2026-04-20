@@ -6,9 +6,9 @@
 -- FILE (raw CDR file ingestion tracker)
 -- ------------------------------------------------------------
 CREATE TABLE file (
-                      ALTER TABLE file ADD COLUMN filename TEXT;
-                      id          SERIAL PRIMARY KEY,
-                      parsed_flag BOOLEAN NOT NULL DEFAULT FALSE
+    id          SERIAL PRIMARY KEY,
+    filename    TEXT,
+    parsed_flag BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- ------------------------------------------------------------
@@ -253,10 +253,9 @@ VALUES
 -- ------------------------------------------------------------
 -- CUSTOMERS
 -- ------------------------------------------------------------
--- INSERT INTO customer (name, address, birthdate)
-VALUES-- ============================================================
-
-      ('Ahmed Ali', 'Beni Suef', '1998-05-10'),
+INSERT INTO customer (name, address, birthdate)
+VALUES
+    ('Ahmed Ali', 'Beni Suef', '1998-05-10'),
     ('Mohamed Hassan', 'Cairo', '1995-09-22');
 
 -- ------------------------------------------------------------

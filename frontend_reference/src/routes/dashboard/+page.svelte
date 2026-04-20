@@ -4,19 +4,7 @@
   let invoices = $state([]);
 
   async function load() {
-    // 1. Security Check
     try {
-      const authRes = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!authRes.ok) {
-        window.location.href = '/login';
-        return;
-      }
-      const user = await authRes.json();
-      if (user.role !== 'customer') {
-        window.location.href = '/admin';
-        return;
-      }
-
       const [pRes, cRes, iRes] = await Promise.all([
         fetch('/api/customer/profile', { credentials: 'include' }),
         fetch('/api/customer/contracts', { credentials: 'include' }),

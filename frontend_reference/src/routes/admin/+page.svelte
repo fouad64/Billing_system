@@ -5,14 +5,11 @@
 
   async function load() {
     // 1. Security Check: Only admins allowed
-    const authRes = await fetch('/api/auth/me', { credentials: 'include' });
-    if (!authRes.ok) {
+    const user = document.querySelector('.nav-user');
+    const roleBadge = document.querySelector('.badge-admin');
+    
+    if (!user || !roleBadge) {
       window.location.href = '/login';
-      return;
-    }
-    const user = await authRes.json();
-    if (user.role !== 'admin') {
-      window.location.href = '/dashboard';
       return;
     }
 

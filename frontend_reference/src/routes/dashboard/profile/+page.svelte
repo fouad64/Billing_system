@@ -32,18 +32,7 @@
     saving = false;
   }
 
-  onMount(async () => {
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!res.ok) {
-        window.location.href = '/login';
-        return;
-      }
-      await loadProfile();
-    } catch {
-      window.location.href = '/login';
-    }
-  });
+  onMount(loadProfile);
 </script>
 
 <svelte:head><title>Edit Profile — FMRZ</title></svelte:head>
