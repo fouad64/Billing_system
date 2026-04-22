@@ -57,7 +57,7 @@
 					<a
 						href="/admin"
 						class="nav-link"
-						class:active={$page.url.pathname.startsWith('/admin')}
+						class:active={$page.url.pathname === '/admin'}
 					>Dashboard</a>
 
 					<a

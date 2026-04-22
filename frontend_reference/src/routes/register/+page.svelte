@@ -1,10 +1,21 @@
 <script>
-  let fullName = $state('');
+  import { onMount } from 'svelte';
+
   let username = $state('');
   let password = $state('');
-  let address = $state('');
+  let msisdn = $state('');
   let error = $state('');
   let loading = $state(false);
+
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.ok) {
+        const user = await res.json();
+        window.location.href = user.role === 'admin' ? '/admin' : '/dashboard';
+      }
+    } catch {}
+  });
 
   async function handleRegister(e) {
     e.preventDefault();
@@ -15,7 +26,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ fullName, username, password, address })
+        body: JSON.stringify({ username, password, msisdn })
       });
       if (res.ok) {
         window.location.href = '/dashboard';
@@ -33,9 +44,9 @@
 <div class="register-page">
   <div class="register-card card-glass animate-fade">
     <div class="register-header">
-      <img src="/eand_logo.svg" alt="e&" class="register-logo" style="height: 120px;" />
-      <h1>Create Account</h1>
-      <p>Join FMRZ and manage your telecom services</p>
+      <img src="/eand_logo.svg" alt="e&" class="register-logo" />
+      <h1>Join e& Billing</h1>
+      <p>Enter your phone number to create an account</p>
     </div>
 
     {#if error}
@@ -44,23 +55,19 @@
 
     <form onsubmit={handleRegister}>
       <div class="form-group">
-        <label class="label" for="fullName">Full Name</label>
-        <input id="fullName" class="input" type="text" bind:value={fullName} placeholder="Ahmed Ali" required />
+        <label class="label" for="msisdn">Phone Number (MSISDN)</label>
+        <input id="msisdn" class="input" type="text" bind:value={msisdn} placeholder="201000000000" required />
       </div>
       <div class="form-group">
         <label class="label" for="reg-username">Username</label>
-        <input id="reg-username" class="input" type="text" bind:value={username} placeholder="ahmed.ali" required />
+        <input id="reg-username" class="input" type="text" bind:value={username} placeholder="choose a username" required />
       </div>
       <div class="form-group">
         <label class="label" for="reg-password">Password</label>
         <input id="reg-password" class="input" type="password" bind:value={password} placeholder="Min 6 characters" required minlength="6" />
       </div>
-      <div class="form-group">
-        <label class="label" for="address">Address</label>
-        <input id="address" class="input" type="text" bind:value={address} placeholder="Cairo, Egypt" />
-      </div>
       <button type="submit" class="btn btn-primary" style="width: 100%;" disabled={loading}>
-        {loading ? 'Creating...' : 'Create Account'}
+        {loading ? 'Verifying...' : 'Create Account'}
       </button>
     </form>
 

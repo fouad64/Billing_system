@@ -32,16 +32,15 @@ public class ServicePackageDAO {
     }
 
     public ServicePackage create(ServicePackage sp) {
-        String sql = "INSERT INTO service_package (name, type, amount, price, priority) " +
-                     "VALUES (?, ?::service_type, ?, ?, ?) RETURNING id";
+        String sql = "INSERT INTO service_package (name, type, amount, priority) " +
+                     "VALUES (?, ?::service_type, ?, ?) RETURNING id";
         // ?::service_type — PostgreSQL cast. Tells PG to treat the string as the ENUM type.
         try (Connection conn = DB.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, sp.getName());
             ps.setString(2, sp.getType());
             ps.setBigDecimal(3, sp.getAmount());
-            ps.setBigDecimal(4, sp.getPrice());
-            ps.setInt(5, sp.getPriority());
+            ps.setInt(4, sp.getPriority());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) sp.setId(rs.getInt("id"));
             }
@@ -55,7 +54,6 @@ public class ServicePackageDAO {
         sp.setName(rs.getString("name"));
         sp.setType(rs.getString("type"));
         sp.setAmount(rs.getBigDecimal("amount"));
-        sp.setPrice(rs.getBigDecimal("price"));
         sp.setPriority(rs.getInt("priority"));
         return sp;
     }

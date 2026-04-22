@@ -1,13 +1,33 @@
 <script>
+  import { onMount } from 'svelte';
+
   let username = $state('');
   let password = $state('');
   let error = $state('');
   let loading = $state(false);
 
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.ok) {
+        const user = await res.json();
+        window.location.href = user.role === 'admin' ? '/admin' : '/dashboard';
+      }
+    } catch {}
+  });
+
   async function handleLogin(e) {
     e.preventDefault();
     error = '';
     loading = true;
+    try {
+      const authCheck = await fetch('/api/auth/me', { credentials: 'include' });
+      if (authCheck.ok) {
+        const user = await authCheck.json();
+        window.location.href = user.role === 'admin' ? '/admin' : '/dashboard';
+        return;
+      }
+    } catch {}
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -38,7 +58,7 @@
 <div class="login-page">
   <div class="login-card card-glass animate-fade">
     <div class="login-header">
-      <img src="/eand_logo.svg" alt="e&" class="login-logo" style="height: 120px;" />
+      <img src="/eand_logo.svg" alt="e&" class="login-logo" />
       <h1>Welcome back</h1>
       <p>Sign in to your account</p>
     </div>

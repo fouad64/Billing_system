@@ -1,10 +1,8 @@
 package com.billing.servlet;
 
-import com.billing.dao.ContractDAO;
 import com.billing.dao.CustomerDAO;
 import com.billing.dao.UserDAO;
 import com.billing.model.AppUser;
-import com.billing.model.Contract;
 import com.billing.model.Customer;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +19,6 @@ public class AuthServlet extends BaseServlet {
 
     private final UserDAO userDAO = new UserDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
-    private final ContractDAO contractDAO = new ContractDAO();
 
     // doPost automatically handles all incoming HTTP POST requests to /api/auth/*
     @Override
@@ -92,44 +89,34 @@ public class AuthServlet extends BaseServlet {
         Map body = readJson(req, Map.class);
         String username = (String) body.get("username");
         String password = (String) body.get("password");
-        String msisdn   = (String) body.get("msisdn");
+        String fullName = (String) body.get("fullName");
+        String address  = (String) body.get("address");
 
-        if (username == null || password == null || msisdn == null) {
-            sendError(res, 400, "username, password, and msisdn required");
+        if (username == null || password == null || fullName == null) {
+            sendError(res, 400, "username, password, and fullName required");
             return;
         }
 
-        // 1. MSISDN VALIDATION (SOTA Workflow)
-        Contract contract = contractDAO.findByMsisdn(msisdn);
-        if (contract == null) {
-            sendError(res, 404, "Phone number not found in our records. Please visit a store.");
-            return;
-        }
-
-        // 2. Check if customer already has an account
-        Customer customer = customerDAO.findById(contract.getCustomerId());
-        if (customer.getUserId() != null) {
-            sendError(res, 409, "This phone number is already linked to an account. Try logging in.");
-            return;
-        }
-
-        // 3. Check if username taken
+        // Check if username taken
         if (userDAO.findByUsername(username) != null) {
             sendError(res, 409, "Username already exists");
             return;
         }
 
-        // 4. Create app_user with hashed password
+        // Create app_user with hashed password
         AppUser user = new AppUser();
         user.setUsername(username);
         user.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt()));
-        user.setFullName(customer.getName()); // Use the name from the existing contract
+        user.setFullName(fullName);
         user.setRole("customer");
         user = userDAO.create(user);
 
-        // 5. Link customer profile to the new user account
+        // Create linked customer profile
+        Customer customer = new Customer();
+        customer.setName(fullName);
+        customer.setAddress(address);
         customer.setUserId(user.getId());
-        customerDAO.update(customer);
+        customerDAO.create(customer);
 
         // Auto-login after registration
         HttpSession session = req.getSession(true);

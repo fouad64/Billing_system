@@ -96,15 +96,15 @@
             <div class="plan-features">
               <div class="feature-row">
                 <span class="feature-label">Voice</span>
-                <span class="feature-value">{pkg.voiceMinutes || 0} Min</span>
+                <span class="feature-value">{pkg.type === 'voice' ? pkg.amount : 0} Min</span>
               </div>
               <div class="feature-row">
                 <span class="feature-label">Data</span>
-                <span class="feature-value">{pkg.dataLimit || 0} MB</span>
+                <span class="feature-value">{pkg.type === 'data' ? pkg.amount : 0} MB</span>
               </div>
               <div class="feature-row">
                 <span class="feature-label">SMS</span>
-                <span class="feature-value">{pkg.smsCount || 0} SMS</span>
+                <span class="feature-value">{pkg.type === 'sms' ? pkg.amount : 0} SMS</span>
               </div>
             </div>
             <button 

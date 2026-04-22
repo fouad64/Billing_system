@@ -14,7 +14,6 @@ public class ServicePackage {
     private String name;
     private String type;          // "voice", "data", or "sms"
     private BigDecimal amount;    // quota: minutes, MB, or SMS count
-    private BigDecimal price;     // monthly price
     private int priority;         // consumption order: lower = used first
 
     public ServicePackage() {}
@@ -30,9 +29,6 @@ public class ServicePackage {
 
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
-
-    public BigDecimal getPrice() { return price; }
-    public void setPrice(BigDecimal price) { this.price = price; }
 
     public int getPriority() { return priority; }
     public void setPriority(int priority) { this.priority = priority; }

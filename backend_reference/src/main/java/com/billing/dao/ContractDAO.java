@@ -55,18 +55,6 @@ public class ContractDAO {
         return list;
     }
 
-    public Contract findByMsisdn(String msisdn) {
-        String sql = SELECT_WITH_JOINS + " WHERE c.msisdn = ?";
-        try (Connection conn = DB.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, msisdn);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return mapRow(rs);
-            }
-        } catch (SQLException e) { e.printStackTrace(); }
-        return null;
-    }
-
     public Contract create(Contract c) {
         String sql = "INSERT INTO contract (customer_id, rateplan_id, msisdn, status, credit_limit, available_credit) " +
                      "VALUES (?, ?, ?, ?::contract_status, ?, ?) RETURNING id";
