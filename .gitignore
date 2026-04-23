@@ -13,6 +13,7 @@ target/
 *.iml
 *.ipr
 src/main/resources/db.properties
+whole_billing.sql
 ### Eclipse ###
 .apt_generated
 .classpath

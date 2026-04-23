@@ -1,4 +1,3 @@
-
 -- =========================================================
 -- DUMMY DATA
 -- For testing and demonstration purposes
@@ -13,12 +12,12 @@ VALUES
     (FALSE, '/tmp/test_cdr_april_2.csv');
 
 ------------------------------------------------------------
--- CUSTOMERS
+-- user_accounts
 ------------------------------------------------------------
-INSERT INTO customer (name, address, birthdate)
+INSERT INTO user_account (name, address, birthdate, role, username, password)
 VALUES
-    ('Ahmed Ali', 'Beni Suef', '1998-05-10'),
-    ('Mohamed Hassan', 'Cairo', '1995-09-22');
+    ('Alice Smith', '123 Main St', '1990-01-01', 'customer', 'alice', 'password1'),
+    ('Bob Johnson', '456 Elm St', '1985-05-15', 'customer', 'bob', 'password2');
 
 ------------------------------------------------------------
 -- RATEPLANS
@@ -49,7 +48,7 @@ VALUES
 ------------------------------------------------------------
 -- CONTRACTS
 ------------------------------------------------------------
-INSERT INTO contract (customer_id, rateplan_id, msisdn, status, credit_limit, available_credit)
+INSERT INTO contract (user_account_id, rateplan_id, msisdn, status, credit_limit, available_credit)
 VALUES
     (1, 1, '201000000001', 'active', 200, 200),
     (2, 2, '201000000002', 'active', 500, 500);

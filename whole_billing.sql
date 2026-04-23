@@ -1,3 +1,197 @@
+-- ============================================================
+-- TELECOM BILLING SCHEMA
+-- ============================================================
+DROP TABLE IF EXISTS cdr,invoice,bill,ror_contract,contract_consumption,contract,rateplan_service_package,service_package,rateplan,customer,user_account,file CASCADE;
+DROP TYPE IF EXISTS service_type,contract_status,bill_status,user_role CASCADE;
+-- ------------------------------------------------------------
+-- FILE (raw CDR file ingestion tracker)
+-- ------------------------------------------------------------
+CREATE TABLE file (
+                      id          SERIAL PRIMARY KEY,
+                      parsed_flag BOOLEAN NOT NULL DEFAULT FALSE,
+                      file_path   TEXT NOT NULL
+);
+
+-- ------------------------------------------------------------
+-- USER
+-- ------------------------------------------------------------
+CREATE TYPE user_role AS ENUM ('admin', 'customer');
+CREATE TABLE user_account (
+                              id       SERIAL PRIMARY KEY,
+                              username VARCHAR(255) NOT NULL UNIQUE,
+                              password VARCHAR(30) NOT NULL,
+                              role     user_role NOT NULL,
+                              name     VARCHAR(255) NOT NULL,
+                              email    VARCHAR(255) NOT NULL UNIQUE,
+                              address  TEXT,
+                              birthdate DATE
+);
+
+-- ------------------------------------------------------------
+-- CUSTOMER
+-- ------------------------------------------------------------
+-- CREATE TABLE customer (
+--                           id        SERIAL PRIMARY KEY,
+--                           name      VARCHAR(255) NOT NULL,
+--                           address   TEXT,
+--                           birthdate DATE
+-- );
+-- ALTER TABLE customer
+--     ADD COLUMN user_account_id INTEGER REFERENCES user_account(id);
+
+-- ------------------------------------------------------------
+-- RATEPLAN
+-- ------------------------------------------------------------
+CREATE TABLE rateplan (
+                          id        SERIAL PRIMARY KEY,
+                          name      VARCHAR(255) NOT NULL,
+                          ror_data  NUMERIC(10,2),     -- e.g. 0.05
+                          ror_voice NUMERIC(10,2),     -- e.g. 0.05
+                          ror_sms   NUMERIC(10,2),     -- e.g. 0.05
+                          price     NUMERIC(10,2)      -- base price of the plan
+);
+
+-- ------------------------------------------------------------
+-- SERVICE_PACKAGE
+-- bundled quotas sold as part of a contract
+-- ------------------------------------------------------------
+CREATE TYPE service_type AS ENUM ('voice', 'data', 'sms', 'free_units');
+CREATE TABLE service_package (
+                                 id       SERIAL PRIMARY KEY,
+                                 name     VARCHAR(255) NOT NULL,
+                                 type     service_type  NOT NULL,  -- 'voice', 'data', 'sms', etc.
+                                 amount   NUMERIC(12,4) NOT NULL, -- quota amount (minutes / MB / count)
+                                 priority INTEGER NOT NULL DEFAULT 1 -- for consumption order (lower = consumed first)
+);
+-- ------------------------------------------------------------
+-- RATEPLAN SERVICE PACKAGES
+-- ------------------------------------------------------------
+CREATE TABLE rateplan_service_package (
+                                          rateplan_id        INTEGER NOT NULL REFERENCES rateplan(id),
+                                          service_package_id INTEGER NOT NULL REFERENCES service_package(id),
+                                          PRIMARY KEY (rateplan_id, service_package_id)
+);
+-- ------------------------------------------------------------
+-- CONTRACT
+-- ties a customer to a rateplan + an MSISDN (phone number)
+-- ------------------------------------------------------------
+CREATE TYPE contract_status AS ENUM ('active', 'suspended', 'terminated');
+CREATE TABLE contract (
+                          id              SERIAL PRIMARY KEY,
+                          user_account_id     INTEGER NOT NULL REFERENCES user_account(id),
+                          rateplan_id     INTEGER NOT NULL REFERENCES rateplan(id),
+                          msisdn          VARCHAR(20) NOT NULL UNIQUE,
+                          status          contract_status NOT NULL DEFAULT 'active',
+                          credit_limit    NUMERIC(12,2) NOT NULL DEFAULT 0,
+                          available_credit NUMERIC(12,2) NOT NULL DEFAULT 0
+);
+
+-- ------------------------------------------------------------
+-- CONTRACT_CONSUMPTION
+-- tracks how much of each service_package has been consumed
+-- in a billing period for a contract
+-- ------------------------------------------------------------
+CREATE TABLE contract_consumption (
+                                      contract_id         INTEGER NOT NULL REFERENCES contract(id),
+                                      service_package_id  INTEGER NOT NULL REFERENCES service_package(id),
+                                      rateplan_id         INTEGER NOT NULL REFERENCES rateplan(id),
+
+                                      starting_date       DATE NOT NULL,
+                                      ending_date         DATE NOT NULL,
+
+                                      consumed            INTEGER NOT NULL DEFAULT 0,
+
+                                      is_billed           BOOLEAN NOT NULL DEFAULT FALSE,
+
+                                      PRIMARY KEY (contract_id, service_package_id, rateplan_id, starting_date, ending_date)
+);
+
+-- ------------------------------------------------------------
+-- ROR_CONTRACT
+-- Think of it as: "for this contract, these are the applied rates"
+-- ------------------------------------------------------------
+CREATE TABLE ror_contract (
+                              contract_id INTEGER NOT NULL REFERENCES contract(id),
+                              rateplan_id INTEGER NOT NULL REFERENCES rateplan(id),
+                              data        INTEGER,
+                              voice       INTEGER,
+                              sms         INTEGER,
+                              PRIMARY KEY (contract_id, rateplan_id)
+    -- bill_id added after bill table below (FK added via ALTER)
+);
+
+-- ------------------------------------------------------------
+-- BILL
+-- one bill per billing cycle per contract
+-- ------------------------------------------------------------
+CREATE TYPE bill_status AS ENUM ('draft', 'issued', 'paid', 'overdue', 'cancelled');
+
+CREATE TABLE bill (
+                      id                   SERIAL PRIMARY KEY,
+                      contract_id          INTEGER NOT NULL REFERENCES contract(id),
+                      billing_period_start DATE NOT NULL,
+                      billing_period_end   DATE NOT NULL,
+                      billing_date         DATE NOT NULL,
+                      recurring_fees       NUMERIC(12,2) NOT NULL DEFAULT 0,
+                      one_time_fees        NUMERIC(12,2) NOT NULL DEFAULT 0,
+                      voice_usage          INTEGER       NOT NULL DEFAULT 0,  -- minutes
+                      data_usage           INTEGER       NOT NULL DEFAULT 0,  -- MB
+                      sms_usage            INTEGER       NOT NULL DEFAULT 0,  -- count
+                      ROR_charge           NUMERIC(12,2) NOT NULL DEFAULT 0,
+                      taxes                NUMERIC(12,2) NOT NULL DEFAULT 0,
+                      total_amount         NUMERIC(12,2) NOT NULL DEFAULT 0,
+                      status               bill_status   NOT NULL DEFAULT 'draft',
+                      is_paid              BOOLEAN       NOT NULL DEFAULT FALSE,
+
+                      UNIQUE (contract_id, billing_period_start)
+);
+
+-- Now we can add the FK from ror_contract -> bill
+ALTER TABLE ror_contract
+    ADD COLUMN bill_id INTEGER REFERENCES bill(id);
+ALTER TABLE contract_consumption
+    ADD COLUMN bill_id INTEGER REFERENCES bill(id);
+-- ------------------------------------------------------------
+-- INVOICE
+-- generated PDF invoice derived from a bill
+-- ------------------------------------------------------------
+CREATE TABLE invoice (
+                         id               SERIAL PRIMARY KEY,
+                         bill_id          INTEGER NOT NULL REFERENCES bill(id),
+                         pdf_path         TEXT,
+                         generation_date  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ------------------------------------------------------------
+-- CDR (Call Detail Record)
+-- raw usage event; parsed from file, rated against rateplan
+-- ------------------------------------------------------------
+CREATE TABLE cdr (
+                     id               SERIAL PRIMARY KEY,
+                     file_id          INTEGER NOT NULL REFERENCES file(id),
+                     dial_a           VARCHAR(20) NOT NULL,  -- calling party MSISDN
+                     dial_b           VARCHAR(20) NOT NULL,  -- called party MSISDN
+                     start_time       TIMESTAMP NOT NULL,
+                     duration         INTEGER NOT NULL DEFAULT 0,  -- seconds
+                     service_id       INTEGER REFERENCES service_package(id),
+                     hplmn            VARCHAR(20),   -- Home PLMN code
+                     vplmn            VARCHAR(20),   -- Visited PLMN code (roaming)
+                     external_charges NUMERIC(12,2) NOT NULL DEFAULT 0,
+                     rated_flag       BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+
+-- ============================================================
+-- INDEXES (performance basics)
+-- ============================================================
+CREATE INDEX idx_cdr_rated_flag     ON cdr(rated_flag);
+CREATE INDEX idx_cdr_file_id        ON cdr(file_id);
+CREATE INDEX idx_cdr_dial_a         ON cdr(dial_a);
+CREATE INDEX idx_contract_msisdn    ON contract(msisdn);
+CREATE INDEX idx_contract_user_account  ON contract(user_account_id);
+CREATE INDEX idx_bill_contract      ON bill(contract_id);
+CREATE INDEX idx_bill_billing_date  ON bill(billing_date);
+CREATE INDEX idx_invoice_bill       ON invoice(bill_id);
 
 -- ============================================================
 -- FUNCTIONS (for billing calculations, etc.)
@@ -688,6 +882,7 @@ ORDER BY billing_period_start DESC;
 END;
 $$ LANGUAGE plpgsql;
 
+
 -- ------------------------------------------------------------
 -- CREATE CUSTOMER
 -- ------------------------------------------------------------
@@ -714,7 +909,6 @@ EXCEPTION
         RAISE EXCEPTION 'create_customer failed for username %: %', p_username, SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
-
 
 -- ------------------------------------------------------------
 -- CREATE ADMIN
@@ -1002,3 +1196,186 @@ EXCEPTION
                         p_contract_id, SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
+-- ============================================================
+-- TRIGGERS
+-- ============================================================
+
+-- Block CDR insert if contract is not active
+CREATE OR REPLACE FUNCTION validate_cdr_contract()
+       RETURNS TRIGGER AS $$
+       DECLARE v_contract contract;
+BEGIN
+SELECT c.* INTO v_contract
+FROM contract c WHERE c.msisdn = NEW.dial_a;
+IF NOT FOUND THEN
+   RAISE EXCEPTION 'No contract found for MSISDN %', NEW.dial_a;
+END IF ;
+   IF v_contract.status <> 'active' THEN
+      RAISE EXCEPTION 'contract for MSISDN % is not active it is %', NEW.dial_a, v_contract.status;
+END IF;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+--trigger on cdr before insert to validate contract status
+CREATE TRIGGER trg_cdr_validate_contract
+    BEFORE INSERT ON cdr
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_cdr_contract();
+
+-- Automatically rate CDR after insert
+CREATE OR REPLACE FUNCTION auto_rate_cdr()
+           RETURNS TRIGGER AS $$
+BEGIN
+           IF NEW.service_id IS NOT NULL THEN
+              PERFORM rate_cdr(NEW.id);
+END IF;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_auto_rate_cdr
+    AFTER INSERT ON cdr
+    FOR EACH ROW
+    EXECUTE FUNCTION auto_rate_cdr();
+
+-- AUTOMATICALLY INITIALIZE CONSUMPTION PERIOD ON FIRST CDR OF THE MONTH
+CREATE OR REPLACE FUNCTION auto_initialize_consumption()
+           RETURNS TRIGGER AS $$
+           DECLARE v_period_start DATE;
+BEGIN
+                   v_period_start := DATE_TRUNC('month', New.start_time )::DATE;
+                                  PERFORM initialize_consumption_period(v_period_start);
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_auto_initialize_consumption
+    BEFORE INSERT ON cdr
+    FOR EACH ROW
+    EXECUTE FUNCTION auto_initialize_consumption();
+
+-- Restore available credit after a bill is paid
+CREATE OR REPLACE FUNCTION trg_restore_credit_on_payment()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.is_paid = TRUE AND OLD.is_paid = FALSE THEN
+UPDATE contract
+SET available_credit = credit_limit
+WHERE id = NEW.contract_id;
+END IF;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_bill_payment
+    AFTER UPDATE ON bill
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_restore_credit_on_payment();
+-- =========================================================
+-- DUMMY DATA
+-- For testing and demonstration purposes
+-- =========================================================
+
+------------------------------------------------------------
+-- FILES
+------------------------------------------------------------
+INSERT INTO file (parsed_flag, file_path)
+VALUES
+    (FALSE, '/tmp/test_cdr_april_1.csv'),
+    (FALSE, '/tmp/test_cdr_april_2.csv');
+
+------------------------------------------------------------
+-- user_accounts
+------------------------------------------------------------
+INSERT INTO user_account (name, address, birthdate, role, username, password)
+VALUES
+    ('Alice Smith', '123 Main St', '1990-01-01', 'customer', 'alice', 'password1'),
+    ('Bob Johnson', '456 Elm St', '1985-05-15', 'customer', 'bob', 'password2');
+
+------------------------------------------------------------
+-- RATEPLANS
+------------------------------------------------------------
+INSERT INTO rateplan (name, ror_data, ror_voice, ror_sms, price)
+VALUES
+    ('Basic',   0.10, 0.20, 0.05, 50),
+    ('Premium', 0.05, 0.10, 0.02, 120);
+
+------------------------------------------------------------
+-- SERVICE PACKAGES
+------------------------------------------------------------
+INSERT INTO service_package (name, type, amount, priority)
+VALUES
+    ('Voice Pack',   'voice', 1000, 1),
+    ('Data Pack',    'data',  5000, 1),
+    ('SMS Pack',     'sms',    200, 1),
+    ('Welcome Bonus','free_units', 50, 2);
+
+------------------------------------------------------------
+-- RATEPLAN → PACKAGES
+------------------------------------------------------------
+INSERT INTO rateplan_service_package (rateplan_id, service_package_id)
+VALUES
+    (1, 1), (1, 3),
+    (2, 1), (2, 2), (2, 3), (2, 4);
+
+------------------------------------------------------------
+-- CONTRACTS
+------------------------------------------------------------
+INSERT INTO contract (user_account_id, rateplan_id, msisdn, status, credit_limit, available_credit)
+VALUES
+    (1, 1, '201000000001', 'active', 200, 200),
+    (2, 2, '201000000002', 'active', 500, 500);
+
+------------------------------------------------------------
+-- ROR_CONTRACT
+------------------------------------------------------------
+INSERT INTO ror_contract (contract_id, rateplan_id, data, voice, sms)
+VALUES
+    (1, 1, 10, 20, 5),
+    (2, 2,  5, 10, 2);
+
+------------------------------------------------------------
+-- CONTRACT_CONSUMPTION (CURRENT PERIOD = APRIL 2026)
+------------------------------------------------------------
+INSERT INTO contract_consumption (
+    contract_id, service_package_id, rateplan_id,
+    starting_date, ending_date, consumed, is_billed
+) VALUES
+      -- Contract 1 (Basic)
+      (1, 1, 1, '2026-04-01', '2026-04-30', 120, FALSE),
+      (1, 3, 1, '2026-04-01', '2026-04-30', 15,  FALSE),
+
+      -- Contract 2 (Premium)
+      (2, 1, 2, '2026-04-01', '2026-04-30', 300, FALSE),
+      (2, 2, 2, '2026-04-01', '2026-04-30', 800, FALSE),
+      (2, 3, 2, '2026-04-01', '2026-04-30', 40,  FALSE),
+      (2, 4, 2, '2026-04-01', '2026-04-30', 10,  FALSE);
+
+------------------------------------------------------------
+-- BILL (PREVIOUS PERIOD = MARCH 2026)
+------------------------------------------------------------
+INSERT INTO bill (
+    contract_id, billing_period_start, billing_period_end, billing_date,
+    recurring_fees, one_time_fees,
+    voice_usage, data_usage, sms_usage,
+    ROR_charge, taxes, total_amount, status, is_paid
+)
+VALUES
+    (1, '2026-03-01', '2026-03-31', '2026-04-01',
+     50, 0,
+     200, 0, 20,
+     12.0, 5.0, 67.0, 'issued', FALSE),
+
+    (2, '2026-03-01', '2026-03-31', '2026-04-01',
+     120, 0,
+     400, 1200, 60,
+     25.0, 10.0, 155.0, 'issued', FALSE);
+
+------------------------------------------------------------
+-- INVOICES
+------------------------------------------------------------
+INSERT INTO invoice (bill_id, pdf_path)
+VALUES
+    (1, '/tmp/invoice_march_1.pdf'),
+    (2, '/tmp/invoice_march_2.pdf');

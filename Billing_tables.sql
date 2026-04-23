@@ -17,23 +17,27 @@ CREATE TABLE file (
 -- ------------------------------------------------------------
 CREATE TYPE user_role AS ENUM ('admin', 'customer');
 CREATE TABLE user_account (
-                          id       SERIAL PRIMARY KEY,
-                          username VARCHAR(255) NOT NULL UNIQUE,
-                          password VARCHAR(30) NOT NULL,
-                          role     user_role NOT NULL
+                              id       SERIAL PRIMARY KEY,
+                              username VARCHAR(255) NOT NULL UNIQUE,
+                              password VARCHAR(30) NOT NULL,
+                              role     user_role NOT NULL,
+                              name     VARCHAR(255) NOT NULL,
+                              email    VARCHAR(255) NOT NULL UNIQUE,
+                              address  TEXT,
+                              birthdate DATE
 );
 
 -- ------------------------------------------------------------
 -- CUSTOMER
 -- ------------------------------------------------------------
-CREATE TABLE customer (
-                          id        SERIAL PRIMARY KEY,
-                          name      VARCHAR(255) NOT NULL,
-                          address   TEXT,
-                          birthdate DATE
-);
-ALTER TABLE customer
-    ADD COLUMN user_account_id INTEGER REFERENCES user_account(id);
+-- CREATE TABLE customer (
+--                           id        SERIAL PRIMARY KEY,
+--                           name      VARCHAR(255) NOT NULL,
+--                           address   TEXT,
+--                           birthdate DATE
+-- );
+-- ALTER TABLE customer
+--     ADD COLUMN user_account_id INTEGER REFERENCES user_account(id);
 
 -- ------------------------------------------------------------
 -- RATEPLAN
@@ -63,9 +67,9 @@ CREATE TABLE service_package (
 -- RATEPLAN SERVICE PACKAGES
 -- ------------------------------------------------------------
 CREATE TABLE rateplan_service_package (
-                                rateplan_id        INTEGER NOT NULL REFERENCES rateplan(id),
-                                service_package_id INTEGER NOT NULL REFERENCES service_package(id),
-                                PRIMARY KEY (rateplan_id, service_package_id)
+                                          rateplan_id        INTEGER NOT NULL REFERENCES rateplan(id),
+                                          service_package_id INTEGER NOT NULL REFERENCES service_package(id),
+                                          PRIMARY KEY (rateplan_id, service_package_id)
 );
 -- ------------------------------------------------------------
 -- CONTRACT
@@ -74,7 +78,7 @@ CREATE TABLE rateplan_service_package (
 CREATE TYPE contract_status AS ENUM ('active', 'suspended', 'terminated');
 CREATE TABLE contract (
                           id              SERIAL PRIMARY KEY,
-                          customer_id     INTEGER NOT NULL REFERENCES customer(id),
+                          user_account_id     INTEGER NOT NULL REFERENCES user_account(id),
                           rateplan_id     INTEGER NOT NULL REFERENCES rateplan(id),
                           msisdn          VARCHAR(20) NOT NULL UNIQUE,
                           status          contract_status NOT NULL DEFAULT 'active',
@@ -88,18 +92,18 @@ CREATE TABLE contract (
 -- in a billing period for a contract
 -- ------------------------------------------------------------
 CREATE TABLE contract_consumption (
-                            contract_id         INTEGER NOT NULL REFERENCES contract(id),
-                            service_package_id  INTEGER NOT NULL REFERENCES service_package(id),
-                            rateplan_id         INTEGER NOT NULL REFERENCES rateplan(id),
+                                      contract_id         INTEGER NOT NULL REFERENCES contract(id),
+                                      service_package_id  INTEGER NOT NULL REFERENCES service_package(id),
+                                      rateplan_id         INTEGER NOT NULL REFERENCES rateplan(id),
 
-                            starting_date       DATE NOT NULL,
-                            ending_date         DATE NOT NULL,
+                                      starting_date       DATE NOT NULL,
+                                      ending_date         DATE NOT NULL,
 
-                            consumed            INTEGER NOT NULL DEFAULT 0,
+                                      consumed            INTEGER NOT NULL DEFAULT 0,
 
-                            is_billed           BOOLEAN NOT NULL DEFAULT FALSE,
+                                      is_billed           BOOLEAN NOT NULL DEFAULT FALSE,
 
-                            PRIMARY KEY (contract_id, service_package_id, rateplan_id, starting_date, ending_date)
+                                      PRIMARY KEY (contract_id, service_package_id, rateplan_id, starting_date, ending_date)
 );
 
 -- ------------------------------------------------------------
@@ -184,7 +188,7 @@ CREATE INDEX idx_cdr_rated_flag     ON cdr(rated_flag);
 CREATE INDEX idx_cdr_file_id        ON cdr(file_id);
 CREATE INDEX idx_cdr_dial_a         ON cdr(dial_a);
 CREATE INDEX idx_contract_msisdn    ON contract(msisdn);
-CREATE INDEX idx_contract_customer  ON contract(customer_id);
+CREATE INDEX idx_contract_user_account  ON contract(user_account_id);
 CREATE INDEX idx_bill_contract      ON bill(contract_id);
 CREATE INDEX idx_bill_billing_date  ON bill(billing_date);
 CREATE INDEX idx_invoice_bill       ON invoice(bill_id);
