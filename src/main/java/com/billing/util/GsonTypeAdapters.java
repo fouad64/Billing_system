@@ -24,6 +24,7 @@ public class GsonTypeAdapters {
     public static final Gson GSON = new GsonBuilder()
         .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
         .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+        .setPrettyPrinting()
         .create();
 
     // --- LOCAL_DATE ADAPTER (e.g., Birthdates: 2000-05-15) ---
