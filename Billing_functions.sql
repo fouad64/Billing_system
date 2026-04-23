@@ -494,7 +494,7 @@ $$ LANGUAGE plpgsql;
 -- consumption rows for the current billing period.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION create_contract(
-    p_customer_id    INTEGER,
+    p_user_account_id    INTEGER,
     p_rateplan_id    INTEGER,
     p_msisdn         VARCHAR(20),
     p_credit_limit   NUMERIC(12,2)
@@ -506,8 +506,8 @@ v_contract_id  INTEGER;
     v_period_end   DATE;
 BEGIN
     -- Validate customer exists
-    IF NOT EXISTS (SELECT 1 FROM customer WHERE id = p_customer_id) THEN
-        RAISE EXCEPTION 'Customer with id % does not exist', p_customer_id;
+    IF NOT EXISTS (SELECT 1 FROM user_account WHERE id = p_user_account_id) THEN
+        RAISE EXCEPTION 'Customer with id % does not exist', p_user_account_id;
 END IF;
 
     -- Validate rateplan exists
@@ -522,14 +522,14 @@ END IF;
 
     -- Insert contract
 INSERT INTO contract (
-    customer_id,
+    user_account_id,
     rateplan_id,
     msisdn,
     status,
     credit_limit,
     available_credit
 ) VALUES (
-             p_customer_id,
+             p_user_account_id,
              p_rateplan_id,
              p_msisdn,
              'active',
@@ -716,55 +716,60 @@ ORDER BY billing_period_start DESC;
 END;
 $$ LANGUAGE plpgsql;
 
-
--- ------------------------------------------------------------
--- CREATE USER ACCOUNT
--- ------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION create_user_account(
-    p_username VARCHAR(255),
-    p_password VARCHAR(30),
-    p_role user_role
-) RETURNS INTEGER
-AS $$
-DECLARE v_new_id INTEGER;
-BEGIN
-INSERT INTO user_account (username, password, role)
-VALUES (p_username, p_password, p_role)
-    RETURNING id INTO v_new_id;
-RETURN v_new_id;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE EXCEPTION 'create_user_account failed for username %: %', p_username, SQLERRM;
-END;
-$$ LANGUAGE plpgsql;
-
 -- ------------------------------------------------------------
 -- CREATE CUSTOMER
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION create_customer(
-    p_name VARCHAR(255),
-    p_address TEXT,
-    p_birthdate DATE,
-    p_user_account_id INTEGER
-) RETURNS INTEGER
-AS $$
-DECLARE v_new_id INTEGER;
+    p_username  VARCHAR(255),
+    p_password  VARCHAR(30),
+    p_name      VARCHAR(255),
+    p_email     VARCHAR(255),
+    p_address   TEXT,
+    p_birthdate DATE
+)
+RETURNS INTEGER AS $$
+DECLARE
+v_new_id INTEGER;
 BEGIN
-    -- Validate user account exists
-    IF NOT EXISTS (SELECT 1 FROM user_account WHERE id = p_user_account_id) THEN
-        RAISE EXCEPTION 'User account with id % does not exist', p_user_account_id;
-END IF;
-INSERT INTO customer (name, address, birthdate, user_account_id)VALUES (p_name, p_address, p_birthdate, p_user_account_id)
+INSERT INTO user_account (username, password, role, name, email, address, birthdate)
+VALUES (p_username, p_password, 'customer', p_name, p_email, p_address, p_birthdate)
     RETURNING id INTO v_new_id;
+
 RETURN v_new_id;
+
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE EXCEPTION 'create_customer failed for name %: %', p_name, SQLERRM;
+        RAISE EXCEPTION 'create_customer failed for username %: %', p_username, SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
 
 
+-- ------------------------------------------------------------
+-- CREATE ADMIN
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION create_admin(
+    p_username  VARCHAR(255),
+    p_password  VARCHAR(30),
+    p_name      VARCHAR(255),
+    p_email     VARCHAR(255),
+    p_address   TEXT,
+    p_birthdate DATE
+)
+RETURNS INTEGER AS $$
+DECLARE
+v_new_id INTEGER;
+BEGIN
+INSERT INTO user_account (username, password, role, name, email, address, birthdate)
+VALUES (p_username, p_password, 'admin', p_name, p_email, p_address, p_birthdate)
+    RETURNING id INTO v_new_id;
+
+RETURN v_new_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'create_admin failed for username %: %', p_username, SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
 -- ---------------------------------------------------------
 -- CHANGE CONTRACT RATEPLAN
 -- ---------------------------------------------------------

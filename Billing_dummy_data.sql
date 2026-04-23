@@ -1,4 +1,3 @@
-
 -- =========================================================
 -- DUMMY DATA
 -- For testing and demonstration purposes
@@ -32,28 +31,12 @@ VALUES
     (FALSE, '/tmp/test_cdr_april_2.csv');
 
 ------------------------------------------------------------
--- CUSTOMERS
+-- user_accounts
 ------------------------------------------------------------
-INSERT INTO customer (name, address, birthdate)
+INSERT INTO user_account (name, address, birthdate, role, username, password)
 VALUES
-    ('Ahmed Ali', 'Beni Suef', '1998-05-10'),
-    ('Mohamed Hassan', 'Cairo', '1995-09-22'),
-    ('Sara Nabil', 'Giza', '1999-02-14'),
-    ('Omar Youssef', 'Alexandria', '1997-11-03'),
-    ('Mona Salah', 'Mansoura', '1996-08-21'),
-    ('Yara Tarek', 'Aswan', '2000-01-09'),
-    ('Kareem Adel', 'Tanta', '1994-04-30'),
-    ('Nour Ahmed', 'Sohag', '2001-06-18'),
-    ('Hassan Mostafa', 'Ismailia', '1993-12-05'),
-    ('Laila Ibrahim', 'Zagazig', '1998-09-27'),
-    ('Amr Saeed', 'Fayoum', '1992-03-16'),
-    ('Rana Hany', 'Port Said', '1999-07-11'),
-    ('Mahmoud Fathy', 'Damietta', '1995-10-24'),
-    ('Dina Sherif', 'Minya', '1997-05-08'),
-    ('Adham Samir', 'Suez', '2000-12-19'),
-    ('Heba Khaled', 'Luxor', '1996-02-02'),
-    ('Ziad Magdy', 'Banha', '1994-06-06'),
-    ('Mariam Eid', 'Cairo', '1998-01-25');
+    ('Alice Smith', '123 Main St', '1990-01-01', 'customer', 'alice', 'password1'),
+    ('Bob Johnson', '456 Elm St', '1985-05-15', 'customer', 'bob', 'password2');
 
 ------------------------------------------------------------
 -- RATEPLANS
@@ -90,7 +73,7 @@ VALUES
 ------------------------------------------------------------
 -- CONTRACTS
 ------------------------------------------------------------
-INSERT INTO contract (customer_id, rateplan_id, msisdn, status, credit_limit, available_credit)
+INSERT INTO contract (user_account_id, rateplan_id, msisdn, status, credit_limit, available_credit)
 VALUES
     (1, 1, '201000000001', 'active', 200, 200),
     (2, 2, '201000000002', 'active', 500, 500),

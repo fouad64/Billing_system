@@ -7,33 +7,22 @@ DROP TYPE IF EXISTS service_type,contract_status,bill_status,user_role CASCADE;
 -- FILE (raw CDR file ingestion tracker)
 -- ------------------------------------------------------------
 CREATE TABLE file (
-                      id          SERIAL PRIMARY KEY,
-                      parsed_flag BOOLEAN NOT NULL DEFAULT FALSE,
-                      file_path   TEXT NOT NULL
-);
-
--- ------------------------------------------------------------
--- USER
--- ------------------------------------------------------------
-CREATE TYPE user_role AS ENUM ('admin', 'customer');
-CREATE TABLE user_account (
-                          id       SERIAL PRIMARY KEY,
-                          username VARCHAR(255) NOT NULL UNIQUE,
-                          password VARCHAR(30) NOT NULL,
-                          role     user_role NOT NULL
+    id          SERIAL PRIMARY KEY,
+    filename    TEXT,
+    parsed_flag BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- ------------------------------------------------------------
 -- CUSTOMER
 -- ------------------------------------------------------------
-CREATE TABLE customer (
-                          id        SERIAL PRIMARY KEY,
-                          name      VARCHAR(255) NOT NULL,
-                          address   TEXT,
-                          birthdate DATE
-);
-ALTER TABLE customer
-    ADD COLUMN user_account_id INTEGER REFERENCES user_account(id);
+-- CREATE TABLE customer (
+--                           id        SERIAL PRIMARY KEY,
+--                           name      VARCHAR(255) NOT NULL,
+--                           address   TEXT,
+--                           birthdate DATE
+-- );
+-- ALTER TABLE customer
+--     ADD COLUMN user_account_id INTEGER REFERENCES user_account(id);
 
 -- ------------------------------------------------------------
 -- RATEPLAN
@@ -65,9 +54,9 @@ CREATE TABLE service_package (
 -- RATEPLAN SERVICE PACKAGES
 -- ------------------------------------------------------------
 CREATE TABLE rateplan_service_package (
-                                rateplan_id        INTEGER NOT NULL REFERENCES rateplan(id),
-                                service_package_id INTEGER NOT NULL REFERENCES service_package(id),
-                                PRIMARY KEY (rateplan_id, service_package_id)
+                                          rateplan_id        INTEGER NOT NULL REFERENCES rateplan(id),
+                                          service_package_id INTEGER NOT NULL REFERENCES service_package(id),
+                                          PRIMARY KEY (rateplan_id, service_package_id)
 );
 -- ------------------------------------------------------------
 -- CONTRACT
@@ -76,7 +65,7 @@ CREATE TABLE rateplan_service_package (
 CREATE TYPE contract_status AS ENUM ('active', 'suspended', 'terminated');
 CREATE TABLE contract (
                           id              SERIAL PRIMARY KEY,
-                          customer_id     INTEGER NOT NULL REFERENCES customer(id),
+                          user_account_id     INTEGER NOT NULL REFERENCES user_account(id),
                           rateplan_id     INTEGER NOT NULL REFERENCES rateplan(id),
                           msisdn          VARCHAR(20) NOT NULL UNIQUE,
                           status          contract_status NOT NULL DEFAULT 'active',
@@ -90,18 +79,18 @@ CREATE TABLE contract (
 -- in a billing period for a contract
 -- ------------------------------------------------------------
 CREATE TABLE contract_consumption (
-                            contract_id         INTEGER NOT NULL REFERENCES contract(id),
-                            service_package_id  INTEGER NOT NULL REFERENCES service_package(id),
-                            rateplan_id         INTEGER NOT NULL REFERENCES rateplan(id),
+                                      contract_id         INTEGER NOT NULL REFERENCES contract(id),
+                                      service_package_id  INTEGER NOT NULL REFERENCES service_package(id),
+                                      rateplan_id         INTEGER NOT NULL REFERENCES rateplan(id),
 
-                            starting_date       DATE NOT NULL,
-                            ending_date         DATE NOT NULL,
+                                      starting_date       DATE NOT NULL,
+                                      ending_date         DATE NOT NULL,
 
-                            consumed            INTEGER NOT NULL DEFAULT 0,
+                                      consumed            INTEGER NOT NULL DEFAULT 0,
 
-                            is_billed           BOOLEAN NOT NULL DEFAULT FALSE,
+                                      is_billed           BOOLEAN NOT NULL DEFAULT FALSE,
 
-                            PRIMARY KEY (contract_id, service_package_id, rateplan_id, starting_date, ending_date)
+                                      PRIMARY KEY (contract_id, service_package_id, rateplan_id, starting_date, ending_date)
 );
 
 -- ------------------------------------------------------------
@@ -189,7 +178,120 @@ CREATE INDEX idx_cdr_rated_flag     ON cdr(rated_flag);
 CREATE INDEX idx_cdr_file_id        ON cdr(file_id);
 CREATE INDEX idx_cdr_dial_a         ON cdr(dial_a);
 CREATE INDEX idx_contract_msisdn    ON contract(msisdn);
-CREATE INDEX idx_contract_customer  ON contract(customer_id);
+CREATE INDEX idx_contract_user_account  ON contract(user_account_id);
 CREATE INDEX idx_bill_contract      ON bill(contract_id);
 CREATE INDEX idx_bill_billing_date  ON bill(billing_date);
 CREATE INDEX idx_invoice_bill       ON invoice(bill_id);
+
+-- ============================================================
+-- FUNCTIONS (for billing calculations, etc.)
+-- ============================================================
+
+
+CREATE OR REPLACE FUNCTION insert_cdr(
+    p_file_id          INTEGER,
+    p_dial_a           VARCHAR(20),
+    p_dial_b           VARCHAR(20),
+    p_start_time       TIMESTAMP,
+    p_duration         INTEGER,
+    p_service_id       INTEGER,
+    p_hplmn            VARCHAR(20),
+    p_vplmn            VARCHAR(20),
+    p_external_charges NUMERIC(12,2)
+)
+RETURNS INTEGER  -- returns the new CDR id
+LANGUAGE plpgsql
+AS $$
+DECLARE
+v_new_id INTEGER;
+BEGIN
+    -- Validate file exists
+    IF NOT EXISTS (SELECT 1 FROM file WHERE id = p_file_id) THEN
+        RAISE EXCEPTION 'File with id % does not exist', p_file_id;
+END IF;
+
+    -- Validate service_package exists if provided
+    IF p_service_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM service_package WHERE id = p_service_id
+    ) THEN
+        RAISE EXCEPTION 'Service package with id % does not exist', p_service_id;
+END IF;
+
+    -- Validate dial_a is not empty
+    IF p_dial_a IS NULL OR TRIM(p_dial_a) = '' THEN
+        RAISE EXCEPTION 'dial_a (calling party MSISDN) cannot be empty';
+END IF;
+
+    -- Validate duration is non-negative
+    IF p_duration < 0 THEN
+        RAISE EXCEPTION 'Duration cannot be negative';
+END IF;
+
+INSERT INTO cdr (
+    file_id,
+    dial_a,
+    dial_b,
+    start_time,
+    duration,
+    service_id,
+    hplmn,
+    vplmn,
+    external_charges,
+    rated_flag          -- always starts as false, rating engine handles this
+)
+VALUES (
+           p_file_id,
+           p_dial_a,
+           p_dial_b,
+           p_start_time,
+           p_duration,
+           p_service_id,
+           p_hplmn,
+           p_vplmn,
+           COALESCE(p_external_charges, 0),
+           FALSE
+       )
+    RETURNING id INTO v_new_id;
+
+RETURN v_new_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'insert_cdr failed: %', SQLERRM;
+END;
+$$;
+
+
+-- ============================================================
+-- dummy data for testing
+-- ============================================================
+
+INSERT INTO rateplan (name, ror_data, ror_voice, ror_sms, price)
+VALUES
+    ('Basic', 0.10, 0.20, 0.05, 50),
+    ('Premium', 0.05, 0.10, 0.02, 120);
+
+-- ------------------------------------------------------------
+-- SERVICE PACKAGES
+-- ------------------------------------------------------------
+INSERT INTO service_package (name, type, amount, priority)
+VALUES
+    ('Voice Pack', 'voice', 1000, 1),
+    ('Data Pack', 'data', 5000, 1),
+    ('SMS Pack', 'sms', 200, 1);
+
+-- ------------------------------------------------------------
+-- CUSTOMERS
+-- ------------------------------------------------------------
+INSERT INTO customer (name, address, birthdate)
+VALUES
+    ('Ahmed Ali', 'Beni Suef', '1998-05-10'),
+    ('Mohamed Hassan', 'Cairo', '1995-09-22');
+
+-- ------------------------------------------------------------
+-- CONTRACTS
+-- ------------------------------------------------------------
+INSERT INTO contract (customer_id, rateplan_id, msisdn, credit_limit, available_credit, status)
+VALUES
+    (1, 1, '201000000001', 200, 200, 'active'),
+    (2, 2, '201000000002', 500, 500, 'active');
