@@ -34,10 +34,12 @@ Use this command to build the frontend, package the application, and start the s
 ```
 
 ### **B. Frontend Development Mode**
-Execute for rapid UI development with hot-reloading:
+Execute for rapid UI development and styling with hot-reloading:
 ```bash
 cd frontend && npm install && npm run dev
 ```
+> [!IMPORTANT]
+> **DEVELOPMENT ONLY**: This mode is strictly for UI/UX styling. It operates on a separate port (`5173`) and **cannot** be used for end-to-end testing, database verification, or production environments. For all functional testing involving the database and API logic, utilize the **Integrated Build (Section A)**.
 
 ### **C. CDR Engine Standalone Execution**
 Verify the CDR Rating engine without full server deployment:
