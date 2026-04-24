@@ -109,28 +109,28 @@
 
     <div class="grid-4">
       <a href="/admin/customers" class="action-card card">
-        <div class="action-icon">
+        <div class="action-icon-box">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
         <h3>Manage Customers</h3>
         <p>Full CRM control panel</p>
       </a>
       <a href="/admin/contracts" class="action-card card">
-        <div class="action-icon">
+        <div class="action-icon-box">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
         </div>
         <h3>Contracts</h3>
         <p>Service lifecycle management</p>
       </a>
       <a href="/admin/billing" class="action-card card">
-        <div class="action-icon">
+        <div class="action-icon-box">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
         <h3>Billing Engine</h3>
         <p>Invoices & financial records</p>
       </a>
       <a href="/admin/cdr" class="action-card card">
-        <div class="action-icon">
+        <div class="action-icon-box">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         </div>
         <h3>Call Explorer</h3>
@@ -174,13 +174,24 @@
   .quick-actions-section { border-top: 1px solid var(--border); padding-top: 2.5rem; }
   .section-header { margin-bottom: 2rem; }
   .section-header h2 { font-size: 1.5rem; font-weight: 800; }
-  .section-header p { font-size: 0.9rem; color: var(--text-muted); }
-
-  .action-card { text-align: center; padding: 2rem; border-radius: 20px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-  .action-card:hover { transform: translateY(-8px); border-color: var(--red); box-shadow: 0 20px 40px rgba(224, 8, 0, 0.12); }
-  .action-icon { color: var(--red); padding: 1.25rem; background: rgba(224, 8, 0, 0.08); border-radius: 18px; margin-bottom: 1.25rem; }
-  .action-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.4rem; }
-  .action-card p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+  .actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
+  .action-card { 
+    display: flex; flex-direction: column; align-items: center; text-align: center; 
+    padding: 2rem 1.5rem; border-radius: 20px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent; text-decoration: none; color: inherit; height: 100%;
+  }
+  .action-card:hover { 
+    background: rgba(255, 255, 255, 0.08); 
+    transform: translateY(-5px);
+    box-shadow: 0 0 0 1px var(--red), 0 10px 30px rgba(0, 0, 0, 0.3);
+  }
+  .action-icon-box { 
+    width: 100%; aspect-ratio: 16/9; background: rgba(224, 8, 0, 0.1); 
+    border-radius: 15px; display: flex; align-items: center; justify-content: center; 
+    margin-bottom: 1.5rem; color: var(--red);
+  }
+  .action-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: white; }
+  .action-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
 
   @keyframes pulse-glow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } }
 </style>

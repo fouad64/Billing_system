@@ -10,7 +10,7 @@ return {
 	assets: new Set(["eand_logo.svg"]),
 	mimeTypes: {".svg":"image/svg+xml"},
 	_: {
-		client: {start:"_app/immutable/entry/start.DI_p7Fs8.js",app:"_app/immutable/entry/app.DsgPnABE.js",imports:["_app/immutable/entry/start.DI_p7Fs8.js","_app/immutable/chunks/CVrVh0hI.js","_app/immutable/chunks/Bg2E0iCm.js","_app/immutable/chunks/CTNTokNZ.js","_app/immutable/chunks/D2qHlwWe.js","_app/immutable/chunks/KwJHjKCn.js","_app/immutable/entry/app.DsgPnABE.js","_app/immutable/chunks/Bg2E0iCm.js","_app/immutable/chunks/BAry0p6x.js","_app/immutable/chunks/KwJHjKCn.js","_app/immutable/chunks/BjY1qIhZ.js","_app/immutable/chunks/BMg6UULY.js","_app/immutable/chunks/CTNTokNZ.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
+		client: {start:"_app/immutable/entry/start.F2WVOkG9.js",app:"_app/immutable/entry/app.BjgLkO1q.js",imports:["_app/immutable/entry/start.F2WVOkG9.js","_app/immutable/chunks/jp_7ZZFV.js","_app/immutable/chunks/UNZZCu5_.js","_app/immutable/chunks/U0L0euFV.js","_app/immutable/chunks/CqRVYgKE.js","_app/immutable/chunks/Bdq_RrVz.js","_app/immutable/entry/app.BjgLkO1q.js","_app/immutable/chunks/UNZZCu5_.js","_app/immutable/chunks/CbtuN0cd.js","_app/immutable/chunks/Bdq_RrVz.js","_app/immutable/chunks/WdrG5ig7.js","_app/immutable/chunks/Dro05P0n.js","_app/immutable/chunks/U0L0euFV.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
 		nodes: [
 			__memo(() => import('./nodes/0.js')),
 			__memo(() => import('./nodes/1.js')),
@@ -24,7 +24,8 @@ return {
 			__memo(() => import('./nodes/9.js')),
 			__memo(() => import('./nodes/10.js')),
 			__memo(() => import('./nodes/11.js')),
-			__memo(() => import('./nodes/12.js'))
+			__memo(() => import('./nodes/12.js')),
+			__memo(() => import('./nodes/13.js'))
 		],
 		remotes: {
 			
@@ -52,59 +53,66 @@ return {
 				endpoint: null
 			},
 			{
+				id: "/admin/cdr",
+				pattern: /^\/admin\/cdr\/?$/,
+				params: [],
+				page: { layouts: [0,], errors: [1,], leaf: 5 },
+				endpoint: null
+			},
+			{
 				id: "/admin/contracts",
 				pattern: /^\/admin\/contracts\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 5 },
+				page: { layouts: [0,], errors: [1,], leaf: 6 },
 				endpoint: null
 			},
 			{
 				id: "/admin/customers",
 				pattern: /^\/admin\/customers\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 6 },
+				page: { layouts: [0,], errors: [1,], leaf: 7 },
 				endpoint: null
 			},
 			{
 				id: "/login",
 				pattern: /^\/login\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 7 },
+				page: { layouts: [0,], errors: [1,], leaf: 8 },
 				endpoint: null
 			},
 			{
 				id: "/packages",
 				pattern: /^\/packages\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 8 },
+				page: { layouts: [0,], errors: [1,], leaf: 9 },
 				endpoint: null
 			},
 			{
 				id: "/profile",
 				pattern: /^\/profile\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 9 },
+				page: { layouts: [0,], errors: [1,], leaf: 10 },
 				endpoint: null
 			},
 			{
 				id: "/profile/edit",
 				pattern: /^\/profile\/edit\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 10 },
+				page: { layouts: [0,], errors: [1,], leaf: 11 },
 				endpoint: null
 			},
 			{
 				id: "/profile/invoices",
 				pattern: /^\/profile\/invoices\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 11 },
+				page: { layouts: [0,], errors: [1,], leaf: 12 },
 				endpoint: null
 			},
 			{
 				id: "/register",
 				pattern: /^\/register\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 12 },
+				page: { layouts: [0,], errors: [1,], leaf: 13 },
 				endpoint: null
 			}
 		],

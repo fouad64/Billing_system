@@ -16,10 +16,22 @@ public class AdminContractServlet extends BaseServlet {
         String path = req.getPathInfo();
         try {
             if (path == null || "/".equals(path)) {
-                sendJson(res, DB.executeSelect("SELECT * FROM contract ORDER BY id DESC"));
+                String sql = "SELECT c.id, c.msisdn, c.status, c.available_credit as \"availableCredit\", " +
+                             "u.name as \"customerName\", r.name as \"rateplanName\" " +
+                             "FROM contract c " +
+                             "JOIN user_account u ON c.user_account_id = u.id " +
+                             "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
+                             "ORDER BY c.id DESC";
+                sendJson(res, DB.executeSelect(sql));
             } else {
                 int id = Integer.parseInt(path.substring(1));
-                List<Map<String, Object>> list = DB.executeSelect("SELECT * FROM contract WHERE id = ?", id);
+                String sql = "SELECT c.*, u.name as \"customerName\", r.name as \"rateplanName\", " +
+                             "c.available_credit as \"availableCredit\" " +
+                             "FROM contract c " +
+                             "JOIN user_account u ON c.user_account_id = u.id " +
+                             "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
+                             "WHERE c.id = ?";
+                List<Map<String, Object>> list = DB.executeSelect(sql, id);
                 if (list.isEmpty()) sendError(res, 404, "Contract not found");
                 else sendJson(res, list.get(0));
             }

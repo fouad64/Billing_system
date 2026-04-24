@@ -138,7 +138,7 @@
       "_state.svelte.js"
     ],
     "css": [
-      "_app/immutable/assets/_layout.ocA64bJC.css"
+      "_app/immutable/assets/_layout.B3A7F_a6.css"
     ]
   },
   "src/routes/+page.svelte": {
@@ -167,7 +167,7 @@
       "_state.svelte.js"
     ],
     "css": [
-      "_app/immutable/assets/_page.D80MGevY.css"
+      "_app/immutable/assets/_page.CtPMAflh.css"
     ]
   },
   "src/routes/admin/billing/+page.svelte": {
@@ -177,6 +177,18 @@
     "isEntry": true,
     "imports": [
       "_renderer.js"
+    ]
+  },
+  "src/routes/admin/cdr/+page.svelte": {
+    "file": "entries/pages/admin/cdr/_page.svelte.js",
+    "name": "entries/pages/admin/cdr/_page.svelte",
+    "src": "src/routes/admin/cdr/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_renderer.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.GAZFuvBM.css"
     ]
   },
   "src/routes/admin/contracts/+page.svelte": {
@@ -237,7 +249,7 @@
       "_root.js"
     ],
     "css": [
-      "_app/immutable/assets/_page.CiF-8ytw.css"
+      "_app/immutable/assets/_page.Co90UtJ8.css"
     ]
   },
   "src/routes/profile/edit/+page.svelte": {

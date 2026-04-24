@@ -44,6 +44,15 @@ public class AppFilter implements Filter {
         // Normalization
         if (path.length() > 1 && path.endsWith("/")) path = path.substring(0, path.length() - 1);
 
+        // Security Guard: Prevent unauthenticated access to dashboards
+        if (path.startsWith("/admin") || path.startsWith("/profile")) {
+            jakarta.servlet.http.HttpSession session = req.getSession(false);
+            if (session == null || session.getAttribute("user") == null) {
+                res.sendRedirect(req.getContextPath() + "/login");
+                return;
+            }
+        }
+
         // Routing
         boolean isApi = path.startsWith("/api/");
         boolean isAsset = path.startsWith("/_app/") || path.contains(".");

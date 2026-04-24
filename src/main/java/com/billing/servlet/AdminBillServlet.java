@@ -14,26 +14,24 @@ public class AdminBillServlet extends BaseServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        try {
+        handle(res, () -> {
             String pathParam = getPathParam(req);
             if (pathParam != null) {
-                // Path: /api/admin/bills/{id}
-                int id = Integer.parseInt(pathParam);
-                List<Map<String, Object>> list = DB.executeSelect("SELECT * FROM bill WHERE id = ?", id);
-                if (list.isEmpty()) sendError(res, 404, "Bill not found");
-                else sendJson(res, list.get(0));
-            } else {
-                String contractId = req.getParameter("contract_id");
-                if (contractId != null) {
-                    sendJson(res, DB.executeSelect("SELECT * FROM bill WHERE contract_id = ? ORDER BY billing_period_start DESC", Integer.parseInt(contractId)));
-                } else {
-                    sendJson(res, DB.executeSelect("SELECT * FROM bill ORDER BY billing_date DESC"));
-                }
+                return DB.executeSelect("SELECT * FROM bill WHERE id = ?", Integer.parseInt(pathParam)).get(0);
             }
-        } catch (NumberFormatException e) {
-            sendError(res, 400, "Invalid ID format");
-        } catch (Exception e) {
-            sendError(res, 500, e.getMessage());
-        }
+
+            String contractId = req.getParameter("contractId") != null ? req.getParameter("contractId") : req.getParameter("contract_id");
+            
+            String sql = "SELECT b.*, u.name as customer_name, c.msisdn " +
+                         "FROM bill b " +
+                         "JOIN contract c ON b.contract_id = c.id " +
+                         "JOIN user_account u ON c.user_account_id = u.id ";
+
+            if (contractId != null) {
+                return DB.executeSelect(sql + " WHERE b.contract_id = ? ORDER BY b.billing_period_start DESC", Integer.parseInt(contractId));
+            } else {
+                return DB.executeSelect(sql + " ORDER BY b.billing_date DESC LIMIT 50");
+            }
+        });
     }
 }

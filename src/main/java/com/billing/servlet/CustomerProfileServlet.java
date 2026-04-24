@@ -8,34 +8,46 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-@WebServlet("/api/customer/profile")
+@WebServlet("/api/customer/*")
 public class CustomerProfileServlet extends BaseServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        // Since we archived Auth, we might not have a session user.
-        // For testing, we'll try to get it from the session, or allow a param.
-        Map<String, Object> sessionUser = (Map<String, Object>) req.getSession().getAttribute("user");
+        String path = req.getPathInfo();
+        Map<String, Object> user = (Map<String, Object>) req.getSession().getAttribute("user");
         
-        Integer userId = null;
-        if (sessionUser != null) {
-            userId = ((Number) sessionUser.get("id")).intValue();
-        } else if (req.getParameter("id") != null) {
-            userId = Integer.parseInt(req.getParameter("id"));
-        }
-
-        if (userId == null) {
-            sendError(res, 401, "Not logged in (and no ID provided)");
+        if (user == null) {
+            sendError(res, 401, "Not logged in");
             return;
         }
         
+        Integer userId = ((Number) user.get("id")).intValue();
+
         try {
-            List<Map<String, Object>> profile = DB.executeSelect(
-                "SELECT id, username, name, email, role, address, birthdate FROM user_account WHERE id = ?", 
-                userId
-            );
-            if (profile.isEmpty()) sendError(res, 404, "Profile not found");
-            else sendJson(res, profile.get(0));
+            if ("/profile".equals(path)) {
+                List<Map<String, Object>> profile = DB.executeSelect(
+                    "SELECT id, username, name, email, address FROM user_account WHERE id = ?", userId);
+                if (profile.isEmpty()) sendError(res, 404, "User not found");
+                else sendJson(res, profile.get(0));
+            } 
+            else if ("/contracts".equals(path)) {
+                List<Map<String, Object>> list = DB.executeSelect(
+                    "SELECT c.msisdn, c.status, c.available_credit as \"availableCredit\", r.name as \"rateplanName\" " +
+                    "FROM contract c " +
+                    "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
+                    "WHERE c.user_account_id = ?", userId);
+                sendJson(res, list);
+            }
+            else if ("/invoices".equals(path)) {
+                List<Map<String, Object>> list = DB.executeSelect(
+                    "SELECT b.* FROM bill b " +
+                    "JOIN contract c ON b.contract_id = c.id " +
+                    "WHERE c.user_account_id = ? ORDER BY b.billing_date DESC", userId);
+                sendJson(res, list);
+            }
+            else {
+                sendError(res, 404, "Unknown customer endpoint: " + path);
+            }
         } catch (Exception e) {
             sendError(res, 500, e.getMessage());
         }

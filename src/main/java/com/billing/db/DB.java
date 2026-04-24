@@ -97,17 +97,30 @@ public class DB {
                     java.util.Map<String, Object> row = new java.util.HashMap<>();
                     for (int i = 1; i <= columns; i++) {
                         Object val = rs.getObject(i);
-                        // Convert Postgres Enums (PGobject) to simple Strings for the frontend
                         if (val != null && val.getClass().getName().contains("PGobject")) {
                             val = val.toString();
                         }
-                        row.put(md.getColumnName(i), val);
+                        row.put(md.getColumnLabel(i), val);
                     }
                     rows.add(row);
                 }
             }
         }
         return rows;
+    }
+
+    /**
+     * SIMPLE OPTION: Execute an INSERT, UPDATE, or DELETE statement.
+     * @return The number of rows affected.
+     */
+    public static int executeUpdate(String sql, Object... params) throws SQLException {
+        try (Connection conn = getConnection();
+             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                ps.setObject(i + 1, params[i]);
+            }
+            return ps.executeUpdate();
+        }
     }
 
     /**
