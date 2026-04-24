@@ -32,14 +32,17 @@ public class ServicePackageDAO {
     }
 
     public ServicePackage create(ServicePackage sp) throws SQLException {
-        String sql = "INSERT INTO service_package (name, type, amount, priority) " +
-                     "VALUES (?, ?::service_type, ?, ?) RETURNING id";
+        String sql = "INSERT INTO service_package (name, type, amount, priority, price, description, is_roaming) " +
+                     "VALUES (?, ?::service_type, ?, ?, ?, ?, ?) RETURNING id";
         try (Connection conn = DB.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, sp.getName());
             ps.setString(2, sp.getType());
             ps.setBigDecimal(3, sp.getAmount());
             ps.setInt(4, sp.getPriority());
+            ps.setBigDecimal(5, sp.getPrice());
+            ps.setString(6, sp.getDescription());
+            ps.setBoolean(7, sp.isRoaming());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) sp.setId(rs.getInt(1));
             }
@@ -54,6 +57,9 @@ public class ServicePackageDAO {
         sp.setType(rs.getString("type"));
         sp.setAmount(rs.getBigDecimal("amount"));
         sp.setPriority(rs.getInt("priority"));
+        sp.setPrice(rs.getBigDecimal("price"));
+        sp.setDescription(rs.getString("description"));
+        sp.setRoaming(rs.getBoolean("is_roaming"));
         return sp;
     }
 }

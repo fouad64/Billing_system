@@ -1,4 +1,5 @@
 <script>
+  import { base } from '$app/paths';
   import { onMount } from 'svelte';
   
   let profile = $state({ name: '', address: '', email: '' });
@@ -50,7 +51,7 @@
 
 <div class="container narrow animate-fade">
   <div class="page-header">
-    <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    <a href="dashboard" class="back-link">← Back to Dashboard</a>
     <h1>Edit <span class="text-gradient">Profile</span></h1>
   </div>
 

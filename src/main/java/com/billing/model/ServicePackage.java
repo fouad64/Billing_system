@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 // Maps to "service_package" table — bundled quotas (voice minutes, data MB, SMS count).
 // Service packages are assigned to contracts and consumed by CDR usage.
 //
-// Table: service_package (id, name, type, amount, priority)
+// Table: service_package (id, name, type, amount, priority, price, description, is_roaming)
 // type is a PostgreSQL ENUM: 'voice', 'data', 'sms'
 // In Java we store it as String — simpler than creating a Java enum for a DB enum.
 public class ServicePackage {
@@ -15,6 +15,9 @@ public class ServicePackage {
     private String type;          // "voice", "data", or "sms"
     private BigDecimal amount;    // quota: minutes, MB, or SMS count
     private int priority;         // consumption order: lower = used first
+    private BigDecimal price;     // cost of the package
+    private String description;   // user-friendly description
+    private boolean isRoaming;    // Flag for roaming support
 
     public ServicePackage() {}
 
@@ -32,4 +35,12 @@ public class ServicePackage {
 
     public int getPriority() { return priority; }
     public void setPriority(int priority) { this.priority = priority; }
+
+    public BigDecimal getPrice() { return price; }
+    public void setPrice(BigDecimal price) { this.price = price; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public boolean isRoaming() { return isRoaming; }
 }

@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-@WebServlet("/api/admin/users/*")
+@WebServlet("/api/admin/customers/*")
 public class AdminUserServlet extends BaseServlet {
 
     private final UserAccountDAO userDAO = new UserAccountDAO();

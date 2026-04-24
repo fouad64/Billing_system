@@ -1,4 +1,4 @@
-import { h as head, ac as attr, c as ensure_array_like, e as escape_html } from "../../../../chunks/renderer.js";
+import { h as head, a as attr, d as ensure_array_like, e as escape_html } from "../../../../chunks/renderer.js";
 function _page($$renderer) {
   let contractId = "";
   let bills = [];

@@ -1,5 +1,4 @@
 <script>
-	import './layout.css';
 	import '../app.css';
 	import { page } from '$app/stores';
 
@@ -11,7 +10,7 @@
 
 	async function checkAuth() {
 		try {
-			const res = await fetch('/api/auth/me', { credentials: 'include' });
+			const res = await fetch(`/api/auth/me`, { credentials: 'include' });
 
 			if (res.ok) user = await res.json(); else user = null;
 		} catch {
@@ -20,9 +19,9 @@
 	}
 
 	async function logout() {
-		await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+		await fetch(`/api/auth/logout`, { method: 'POST', credentials: 'include' });
 		user = null;
-		window.location.href = '/';
+		window.location.href = `/`;
 	}
 
 	$effect(() => {
@@ -33,11 +32,15 @@
 <div class="app">
 	<nav class="navbar">
 		<div class="nav-inner container">
-			<a href="/" class="nav-brand"><img src="/eand_logo.svg" alt="e&" class="nav-logo" style="height: 40px;" /></a>
+			<a href="/" class="nav-brand" aria-label="Home">
+				<img src="/eand_logo.svg" alt="e&" class="nav-logo" style="height: 40px;" />
+			</a>
 
 			<button
 				class="nav-toggle"
 				onclick={() => navOpen = !navOpen}
+				aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
+				aria-expanded={navOpen}
 			><span></span><span></span><span></span></button>
 
 			<div class="nav-links" class:open={navOpen}>

@@ -28,7 +28,7 @@
   <div class="page-header">
     <h1>Customers</h1>
     <div style="display:flex;gap:1rem">
-      <input class="input" style="width:250px" placeholder="Search..." bind:value={search} oninput={() => setTimeout(load, 300)} />
+      <input class="input" style="width:250px" placeholder="Search..." bind:value={search} oninput={() => setTimeout(load, 300)} aria-label="Search customers" />
       <button class="btn btn-primary" onclick={() => showModal = true}>+ Add</button>
     </div>
   </div>
@@ -39,13 +39,41 @@
 </div>
 
 {#if showModal}
-<div class="modal-overlay" onclick={() => showModal = false}><div class="modal card-glass animate-fade" onclick={e => e.stopPropagation()}>
+<div
+  class="modal-overlay"
+  role="button"
+  tabindex="0"
+  aria-label="Close dialog"
+  onclick={() => showModal = false}
+  onkeydown={(e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') showModal = false; }}
+>
+<div
+  class="modal card-glass animate-fade"
+  role="dialog"
+  tabindex="-1"
+  aria-modal="true"
+  aria-label="Add new customer"
+  onclick={e => e.stopPropagation()}
+  onkeydown={(e) => { if (e.key === 'Escape') showModal = false; }}
+>
   <h2>Add New Customer</h2>
   <form onsubmit={createCustomer}>
-    <div class="form-group"><label class="label">Full Name</label><input class="input" bind:value={newCustomer.name} required /></div>
-    <div class="form-group"><label class="label">Email Address</label><input class="input" type="email" bind:value={newCustomer.email} placeholder="ahmed@email.com" /></div>
-    <div class="form-group"><label class="label">Mailing Address</label><input class="input" bind:value={newCustomer.address} /></div>
-    <div class="form-group"><label class="label">Birthdate</label><input class="input" type="date" bind:value={newCustomer.birthdate} /></div>
+    <div class="form-group">
+      <label class="label" for="customer_full_name">Full Name</label>
+      <input id="customer_full_name" class="input" bind:value={newCustomer.name} required />
+    </div>
+    <div class="form-group">
+      <label class="label" for="customer_email">Email Address</label>
+      <input id="customer_email" class="input" type="email" bind:value={newCustomer.email} placeholder="ahmed@email.com" />
+    </div>
+    <div class="form-group">
+      <label class="label" for="customer_address">Mailing Address</label>
+      <input id="customer_address" class="input" bind:value={newCustomer.address} />
+    </div>
+    <div class="form-group">
+      <label class="label" for="customer_birthdate">Birthdate</label>
+      <input id="customer_birthdate" class="input" type="date" bind:value={newCustomer.birthdate} />
+    </div>
     <div style="display:flex;gap:1rem;justify-content:flex-end"><button type="button" class="btn btn-secondary" onclick={() => showModal = false}>Cancel</button><button type="submit" class="btn btn-primary">Create Customer</button></div>
   </form>
 </div></div>

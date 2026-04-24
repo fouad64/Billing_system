@@ -36,18 +36,22 @@ public class ContractDAO {
         return null;
     }
 
-    public void create(Contract c) throws SQLException {
-        String sql = "INSERT INTO contract (user_account_id, rateplan_id, msisdn, status, credit_limit, available_credit) " +
-                     "VALUES (?, ?, ?, ?::contract_status, ?, ?)";
+    public int create(Contract c) throws SQLException {
+        // PROFESSIONALLY INTEGRATED: Call Mohamed's 'create_contract' function
+        String sql = "{ ? = call create_contract(?, ?, ?, ?) }";
         try (Connection conn = DB.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, c.getUserAccountId());
-            ps.setInt(2, c.getRatePlanId());
-            ps.setString(3, c.getMsisdn());
-            ps.setString(4, c.getStatus());
-            ps.setDouble(5, c.getCreditLimit());
-            ps.setDouble(6, c.getAvailableCredit());
-            ps.executeUpdate();
+             CallableStatement cs = conn.prepareCall(sql)) {
+            
+            cs.registerOutParameter(1, Types.INTEGER);
+            cs.setInt(2, c.getUserAccountId());
+            cs.setInt(3, c.getRatePlanId());
+            cs.setString(4, c.getMsisdn());
+            cs.setDouble(5, c.getCreditLimit());
+            
+            cs.execute();
+            int newId = cs.getInt(1);
+            c.setId(newId);
+            return newId;
         }
     }
 

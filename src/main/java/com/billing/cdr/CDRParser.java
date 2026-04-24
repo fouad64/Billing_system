@@ -1,11 +1,20 @@
 package com.billing.cdr;
 
-import com.billing.db.DB;
-
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.*;
-import java.sql.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.sql.Types;
+
+import com.billing.db.DB;
 
 public class CDRParser {
 

@@ -47,7 +47,7 @@ declare module "$app/types" {
 			"/packages": Record<string, never>;
 			"/register": Record<string, never>
 		};
-		Pathname(): "/" | "/admin" | "/admin/billing" | "/admin/contracts" | "/admin/customers" | "/dashboard" | "/dashboard/invoices" | "/dashboard/profile" | "/login" | "/packages" | "/register";
+		Pathname(): "/" | "/admin/" | "/admin/billing/" | "/admin/contracts/" | "/admin/customers/" | "/dashboard/" | "/dashboard/invoices/" | "/dashboard/profile/" | "/login/" | "/packages/" | "/register/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): "/eand_logo.svg" | string & {};
 	}

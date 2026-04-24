@@ -30,7 +30,6 @@ public class BillDAO {
                 bill.setBillingPeriodEnd(rs.getDate("billing_period_end"));
                 bill.setBillingDate(rs.getDate("billing_date"));
                 
-                // BigDecimal: used for money to avoid floating point rounding errors
                 bill.setRecurringFees(rs.getBigDecimal("recurring_fees"));
                 bill.setOneTimeFees(rs.getBigDecimal("one_time_fees"));
                 bill.setVoiceUsage(rs.getInt("voice_usage"));
@@ -85,6 +84,7 @@ public class BillDAO {
         }
         return null;
     }
+
     public List<Bill> findAll() throws SQLException {
         List<Bill> bills = new ArrayList<>();
         String sql = "SELECT * FROM bill ORDER BY billing_date DESC";
@@ -114,5 +114,31 @@ public class BillDAO {
             }
         }
         return bills;
+    }
+
+    /**
+     * PROFESSIONALLY INTEGRATED: Call Mohamed's 'pay_bill' SQL function.
+     */
+    public void pay(int billId, String pdfPath) throws SQLException {
+        String sql = "{ call pay_bill(?, ?) }";
+        try (Connection conn = DB.getConnection();
+             java.sql.CallableStatement cs = conn.prepareCall(sql)) {
+            cs.setInt(1, billId);
+            cs.setString(2, pdfPath);
+            cs.execute();
+        }
+    }
+
+    /**
+     * PROFESSIONALLY INTEGRATED: Call Mohamed's 'generate_bill' SQL function for a contract.
+     */
+    public void generate(int contractId, java.time.LocalDate periodStart) throws SQLException {
+        String sql = "{ call generate_bill(?, ?) }";
+        try (Connection conn = DB.getConnection();
+             java.sql.CallableStatement cs = conn.prepareCall(sql)) {
+            cs.setInt(1, contractId);
+            cs.setDate(2, java.sql.Date.valueOf(periodStart));
+            cs.execute();
+        }
     }
 }

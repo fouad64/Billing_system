@@ -1,4 +1,5 @@
 <script>
+  import { base } from '$app/paths';
   let profile = $state(null);
   let contracts = $state([]);
   let invoices = $state([]);
@@ -71,7 +72,7 @@
           <div class="profile-row"><span class="label">Address</span><span>{profile.address || '—'}</span></div>
           <div class="profile-row"><span class="label">Email</span><span>{profile.email || '—'}</span></div>
         </div>
-        <a href="/dashboard/profile" class="btn btn-secondary" style="width: fit-content; margin-top: 1rem;">Edit Profile</a>
+        <a href="dashboard/profile" class="btn btn-secondary" style="width: fit-content; margin-top: 1rem;">Edit Profile</a>
       </div>
     </div>
   {/if}

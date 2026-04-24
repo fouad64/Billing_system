@@ -32,18 +32,11 @@
             <version>42.7.5</version>
         </dependency>
 
-        <!-- SOTA JSON Handling -->
+        <!-- JSON Handling -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.12.1</version>
-        </dependency>
-
-        <!-- Security: BCrypt -->
-        <dependency>
-            <groupId>org.mindrot</groupId>
-            <artifactId>jbcrypt</artifactId>
-            <version>0.4</version>
         </dependency>
 
         <!-- Invoicing: JasperReports -->
@@ -52,15 +45,38 @@
             <artifactId>jasperreports</artifactId>
             <version>6.21.0</version>
         </dependency>
+
+        <!-- HikariCP Connection Pool -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>6.2.1</version>
+        </dependency>
     </dependencies>
 
     <build>
-        <finalName>Billing_system</finalName>
+        <finalName>ROOT</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-war-plugin</artifactId>
                 <version>3.4.0</version>
+            </plugin>
+            <!-- Cargo: Professional Tomcat Runner -->
+            <plugin>
+                <groupId>org.codehaus.cargo</groupId>
+                <artifactId>cargo-maven3-plugin</artifactId>
+                <version>1.10.13</version>
+                <configuration>
+                    <container>
+                        <containerId>tomcat11x</containerId>
+                        <home>/home/zkhattab/portable/tomcat11</home>
+                    </container>
+                    <configuration>
+                        <type>existing</type>
+                        <home>/home/zkhattab/portable/tomcat11</home>
+                    </configuration>
+                </configuration>
             </plugin>
         </plugins>
     </build>

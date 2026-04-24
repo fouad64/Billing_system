@@ -46,7 +46,9 @@ CREATE TABLE service_package (
                                  name     VARCHAR(255) NOT NULL,
                                  type     service_type  NOT NULL,  -- 'voice', 'data', 'sms', etc.
                                  amount   NUMERIC(12,4) NOT NULL, -- quota amount (minutes / MB / count)
-                                 priority INTEGER NOT NULL DEFAULT 1 -- for consumption order (lower = consumed first)
+                                 priority INTEGER NOT NULL DEFAULT 1, -- for consumption order (lower = consumed first)
+                                 is_roaming BOOLEAN NOT NULL DEFAULT FALSE -- true = roaming-only bundle
+
 );
 -- ------------------------------------------------------------
 -- RATEPLAN SERVICE PACKAGES
@@ -98,9 +100,12 @@ CREATE TABLE contract_consumption (
 CREATE TABLE ror_contract (
                               contract_id INTEGER NOT NULL REFERENCES contract(id),
                               rateplan_id INTEGER NOT NULL REFERENCES rateplan(id),
-                              data        INTEGER,
-                              voice       INTEGER,
-                              sms         INTEGER,
+                              data        INTEGER NOT NULL DEFAULT 0,
+                              voice       INTEGER NOT NULL DEFAULT 0,
+                              sms         INTEGER NOT NULL DEFAULT 0,
+                              roam_data   INTEGER NOT NULL DEFAULT 0,
+                              roam_voice  INTEGER NOT NULL DEFAULT 0,
+                              roam_sms    INTEGER NOT NULL DEFAULT 0,
                               PRIMARY KEY (contract_id, rateplan_id)
     -- bill_id added after bill table below (FK added via ALTER)
 );

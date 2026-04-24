@@ -1,4 +1,5 @@
 <script>
+  import { base } from '$app/paths';
   import { onMount } from 'svelte';
   
   let invoices = $state([]);
@@ -25,7 +26,7 @@
 
 <div class="container animate-fade">
   <div class="page-header">
-    <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    <a href="dashboard" class="back-link">← Back to Dashboard</a>
     <h1>My <span class="text-gradient">Invoices</span></h1>
   </div>
 

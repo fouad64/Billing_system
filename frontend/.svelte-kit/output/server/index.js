@@ -5,11 +5,12 @@ import { Redirect, SvelteKitError, ActionFailure, HttpError } from "@sveltejs/ki
 import { with_request_store, merge_tracing, try_get_request_store } from "@sveltejs/kit/internal/server";
 import { a as assets, b as base, c as app_dir, r as relative, o as override, d as reset } from "./chunks/environment.js";
 import * as devalue from "devalue";
-import { m as make_trackable, d as disable_search, a as decode_params, S as SCHEME, v as validate_layout_server_exports, b as validate_layout_exports, c as validate_page_server_exports, e as validate_page_exports, n as normalize_path, r as resolve, f as decode_pathname, g as validate_server_exports } from "./chunks/exports.js";
+import { m as make_trackable, d as disable_search, a as decode_params, S as SCHEME, n as normalize_path, r as resolve, b as decode_pathname } from "./chunks/url.js";
 import { b as base64_encode, t as text_decoder, a as text_encoder, g as get_relative_path } from "./chunks/utils.js";
 import "clsx";
 import { w as writable, r as readable } from "./chunks/index.js";
 import { p as public_env, r as read_implementation, o as options, s as set_private_env, a as set_public_env, g as get_hooks, b as set_read_implementation } from "./chunks/internal.js";
+import { v as validate_layout_server_exports, a as validate_layout_exports, b as validate_page_server_exports, c as validate_page_exports, d as validate_server_exports } from "./chunks/exports.js";
 import { parse, serialize } from "cookie";
 import * as set_cookie_parser from "set-cookie-parser";
 function with_resolvers() {
@@ -3293,7 +3294,7 @@ async function internal_respond(request, options2, manifest, state) {
     fetch: null,
     getClientAddress: state.getClientAddress || (() => {
       throw new Error(
-        `${"@sveltejs/adapter-auto"} does not specify getClientAddress. Please raise an issue`
+        `${"@sveltejs/adapter-static"} does not specify getClientAddress. Please raise an issue`
       );
     }),
     locals: {},

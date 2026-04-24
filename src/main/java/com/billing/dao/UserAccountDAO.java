@@ -2,10 +2,7 @@ package com.billing.dao;
 
 import com.billing.db.DB;
 import com.billing.model.UserAccount;
-import org.mindrot.jbcrypt.BCrypt;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
 
 public class UserAccountDAO {
 
@@ -18,9 +15,8 @@ public class UserAccountDAO {
             ResultSet rs = stmt.executeQuery();
             
             if (rs.next()) {
-                String hash = rs.getString("password");
-                // Verify BCrypt hash
-                if (BCrypt.checkpw(password, hash)) {
+                String storedPassword = rs.getString("password");
+                if (password.equals(storedPassword)) {
                     return mapRow(rs);
                 }
             }
@@ -28,22 +24,25 @@ public class UserAccountDAO {
         return null;
     }
 
+    /**
+     * PROFESSIONALLY INTEGRATED: Calls Mohamed's 'create_customer' SQL function.
+     * This ensures all database-level triggers and setup logic are executed.
+     */
     public void register(UserAccount user) throws SQLException {
-        String sql = "INSERT INTO user_account (username, password, role, name, email, address, birthdate) " +
-                     "VALUES (?, ?, ?::user_role, ?, ?, ?, ?)";
+        String sql = "{ ? = call create_customer(?, ?, ?, ?, ?, ?) }";
         try (Connection conn = DB.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+             CallableStatement cs = conn.prepareCall(sql)) {
             
-            stmt.setString(1, user.getUsername());
-            // Ensure password is hashed before database storage
-            stmt.setString(2, BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
-            stmt.setString(3, user.getRole());
-            stmt.setString(4, user.getName());
-            stmt.setString(5, user.getEmail());
-            stmt.setString(6, user.getAddress());
-            stmt.setObject(7, user.getBirthdate());
+            cs.registerOutParameter(1, Types.INTEGER);
+            cs.setString(2, user.getUsername());
+            cs.setString(3, user.getPassword()); // Plain text per request
+            cs.setString(4, user.getName());
+            cs.setString(5, user.getEmail());
+            cs.setString(6, user.getAddress());
+            cs.setObject(7, user.getBirthdate());
             
-            stmt.executeUpdate();
+            cs.execute();
+            user.setId(cs.getInt(1));
         }
     }
 
@@ -52,8 +51,9 @@ public class UserAccountDAO {
         try (Connection conn = DB.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return mapRow(rs);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return mapRow(rs);
+            }
         }
         return null;
     }
