@@ -84,6 +84,12 @@
       <div class="plans-grid">
         {#each servicePkgs as pkg, i}
           <div class="plan-card animate-fade" style="animation-delay: {i * 0.1}s">
+            {#if pkg.is_roaming}
+              <div class="plan-badge roaming">🌍 Roaming Ready</div>
+            {:else if i % 3 === 0}
+              <div class="plan-badge promo">Exclusive Deal</div>
+            {/if}
+            
             <div class="plan-header">
               <h3>{pkg.name}</h3>
               <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: -0.5rem; margin-bottom: 1rem;">{pkg.description}</p>
@@ -105,6 +111,12 @@
               <div class="feature-row">
                 <span class="feature-label">SMS</span>
                 <span class="feature-value">{pkg.type === 'sms' ? pkg.amount : 0} SMS</span>
+              </div>
+              <div class="feature-row" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);">
+                <span class="feature-label">Support</span>
+                <span class="feature-value" style="color: {pkg.is_roaming ? 'var(--red)' : 'inherit'}">
+                  {pkg.is_roaming ? 'International' : 'Local Only'}
+                </span>
               </div>
             </div>
             <button 
@@ -164,7 +176,10 @@
     font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
+    z-index: 10;
   }
+  .plan-badge.roaming { background: #3B82F6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+  .plan-badge.promo { background: #F59E0B; }
   .plan-header { text-align: center; }
   .plan-header h3 {
     font-size: 1.25rem;

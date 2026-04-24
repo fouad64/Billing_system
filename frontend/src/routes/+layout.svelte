@@ -61,7 +61,7 @@
 						href="/admin"
 						class="nav-link"
 						class:active={$page.url.pathname === '/admin'}
-					>Dashboard</a>
+					>Admin Panel</a>
 
 					<a
 						href="/admin/customers"
@@ -82,30 +82,30 @@
 					>Billing</a>
 				{:else if user && user.role === 'customer'}
 					<a
-						href="/dashboard"
+						href="/profile"
 						class="nav-link"
-						class:active={$page.url.pathname === '/dashboard'}
-					>Dashboard</a>
+						class:active={$page.url.pathname === '/profile'}
+					>Profile</a>
 
 					<a
-						href="/dashboard/invoices"
+						href="/profile/invoices"
 						class="nav-link"
-						class:active={$page.url.pathname.startsWith('/dashboard/invoices')}
-					>Invoices</a>
+						class:active={$page.url.pathname.startsWith('/profile/invoices')}
+					>My Invoices</a>
 				{/if}
 
 				<div class="nav-spacer"></div>
 
 				{#if user}
+					<button class="btn btn-ghost" onclick={logout} style="margin-right: 0.5rem;">Logout</button>
+					
 					<span class="nav-user">
 						<span
 							class="badge {user.role === 'admin' ? 'badge-admin' : 'badge-customer'}"
 						>{user.role}</span>
 
-						{user.fullName}
+						{user.name || user.username}
 					</span>
-
-					<button class="btn btn-ghost" onclick={logout}>Logout</button>
 				{:else}
 					<a href="/login" class="btn btn-ghost">Login</a>
 					<a href="/register" class="btn btn-primary">Register</a>

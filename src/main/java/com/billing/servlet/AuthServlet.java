@@ -37,7 +37,6 @@ public class AuthServlet extends BaseServlet {
         String password = (String) body.get("password");
 
         try {
-            // Simplest way: Call the DB helper directly
             List<Map<String, Object>> users = DB.executeSelect(
                 "SELECT id, username, name, email, role FROM user_account WHERE username = ? AND password = ?",
                 username, password
@@ -53,7 +52,7 @@ public class AuthServlet extends BaseServlet {
             session.setAttribute("user", user);
             sendJson(res, user);
         } catch (Exception e) {
-            sendError(res, 500, e.getMessage());
+            sendError(res, 500, "Authentication error");
         }
     }
 

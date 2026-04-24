@@ -44,8 +44,6 @@ public class DB {
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
             dataSource = new HikariDataSource(config);
-            System.out.println("[DB] Connection Pool initialized.");
-            
         } catch (Exception e) {
             System.err.println("CRITICAL: Failed to initialize HikariCP Connection Pool");
             e.printStackTrace();
@@ -98,7 +96,12 @@ public class DB {
                 while (rs.next()) {
                     java.util.Map<String, Object> row = new java.util.HashMap<>();
                     for (int i = 1; i <= columns; i++) {
-                        row.put(md.getColumnName(i), rs.getObject(i));
+                        Object val = rs.getObject(i);
+                        // Convert Postgres Enums (PGobject) to simple Strings for the frontend
+                        if (val != null && val.getClass().getName().contains("PGobject")) {
+                            val = val.toString();
+                        }
+                        row.put(md.getColumnName(i), val);
                     }
                     rows.add(row);
                 }

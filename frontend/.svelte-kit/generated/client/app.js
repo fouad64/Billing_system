@@ -24,11 +24,11 @@ export const dictionary = {
 		"/admin/billing": [4],
 		"/admin/contracts": [5],
 		"/admin/customers": [6],
-		"/dashboard": [7],
-		"/dashboard/invoices": [8],
-		"/dashboard/profile": [9],
-		"/login": [10],
-		"/packages": [11],
+		"/login": [7],
+		"/packages": [8],
+		"/profile": [9],
+		"/profile/edit": [10],
+		"/profile/invoices": [11],
 		"/register": [12]
 	};
 
