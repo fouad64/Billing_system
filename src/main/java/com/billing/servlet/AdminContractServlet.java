@@ -1,28 +1,27 @@
 package com.billing.servlet;
 
-import com.billing.dao.ContractDAO;
-import com.billing.model.Contract;
+import com.billing.db.DB;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 @WebServlet("/api/admin/contracts/*")
 public class AdminContractServlet extends BaseServlet {
-
-    private final ContractDAO contractDAO = new ContractDAO();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
         String path = req.getPathInfo();
         try {
             if (path == null || "/".equals(path)) {
-                sendJson(res, contractDAO.findAll());
+                sendJson(res, DB.executeSelect("SELECT * FROM contract ORDER BY id DESC"));
             } else {
                 int id = Integer.parseInt(path.substring(1));
-                Contract c = contractDAO.findById(id);
-                if (c == null) sendError(res, 404, "Contract not found");
-                else sendJson(res, c);
+                List<Map<String, Object>> list = DB.executeSelect("SELECT * FROM contract WHERE id = ?", id);
+                if (list.isEmpty()) sendError(res, 404, "Contract not found");
+                else sendJson(res, list.get(0));
             }
         } catch (Exception e) {
             sendError(res, 500, e.getMessage());
@@ -32,10 +31,13 @@ public class AdminContractServlet extends BaseServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
         try {
-            Contract c = readJson(req, Contract.class);
-            contractDAO.create(c);
+            Map body = readJson(req, Map.class);
+            List<Map<String, Object>> result = DB.executeSelect(
+                "INSERT INTO contract (customer_id, rateplan_id, status) VALUES (?, ?, ?) RETURNING *",
+                body.get("customerId"), body.get("ratePlanId"), body.get("status")
+            );
             res.setStatus(201);
-            sendJson(res, c);
+            sendJson(res, result.get(0));
         } catch (Exception e) {
             sendError(res, 500, e.getMessage());
         }
