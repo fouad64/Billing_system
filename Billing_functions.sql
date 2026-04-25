@@ -23,7 +23,7 @@ RETURN CASE p_service_type
            WHEN 'voice' THEN CEIL(p_duration / 60.0)  -- convert seconds to minutes, round up
            WHEN 'data'  THEN p_duration
            WHEN 'sms'   THEN 1
-           WHEN 'free_units' THEN 1
+           WHEN 'free_units' THEN p_duration
     END;
 END;
 $$ LANGUAGE plpgsql;
@@ -161,6 +161,8 @@ v_cdr            cdr;
     v_deduct         NUMERIC;
     v_ror_rate       NUMERIC;
     v_overage_charge NUMERIC := 0;
+    v_is_roaming     BOOLEAN := FALSE;
+    v_roaming_multiplier NUMERIC := 2;
     v_period_start   DATE;
     v_period_end     DATE;
 BEGIN
@@ -169,6 +171,11 @@ SELECT * INTO v_cdr FROM cdr WHERE id = p_cdr_id;
 IF NOT FOUND THEN
         RAISE EXCEPTION 'CDR with id % not found', p_cdr_id;
 END IF;
+
+    -- Roaming detection (HPLMN vs VPLMN). If both present and differ => roaming.
+    IF v_cdr.hplmn IS NOT NULL AND v_cdr.vplmn IS NOT NULL AND v_cdr.hplmn <> v_cdr.vplmn THEN
+        v_is_roaming := TRUE;
+    END IF;
 
     -- Guard: skip if already rated
     IF v_cdr.rated_flag THEN
@@ -219,6 +226,7 @@ WHERE cc.contract_id   = v_contract.id
   AND cc.ending_date   = v_period_end
   AND cc.is_billed     = FALSE
   AND sp.type          = v_service_type   -- only match relevant service type
+  AND sp.is_roaming    = v_is_roaming     -- roaming CDR consumes roaming bundle only
 ORDER BY sp.priority ASC
     LOOP
         EXIT WHEN v_remaining <= 0;
@@ -251,21 +259,33 @@ SELECT CASE v_service_type
 FROM rateplan
 WHERE id = v_contract.rateplan_id;
 
-v_overage_charge := v_remaining * COALESCE(v_ror_rate, 0);
+        IF v_is_roaming THEN
+            v_ror_rate := COALESCE(v_ror_rate, 0) * v_roaming_multiplier;
+        ELSE
+            v_ror_rate := COALESCE(v_ror_rate, 0);
+        END IF;
+
+v_overage_charge := v_remaining * v_ror_rate;
 
         -- Accumulate overage units in ror_contract
-INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms)
+INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms, roam_voice, roam_data, roam_sms)
 VALUES (
            v_contract.id,
            v_contract.rateplan_id,
-           CASE WHEN v_service_type = 'voice' THEN v_remaining ELSE 0 END,
-           CASE WHEN v_service_type = 'data'  THEN v_remaining ELSE 0 END,
-           CASE WHEN v_service_type = 'sms'   THEN v_remaining ELSE 0 END
+           CASE WHEN (NOT v_is_roaming) AND v_service_type = 'voice' THEN v_remaining ELSE 0 END,
+           CASE WHEN (NOT v_is_roaming) AND v_service_type = 'data'  THEN v_remaining ELSE 0 END,
+           CASE WHEN (NOT v_is_roaming) AND v_service_type = 'sms'   THEN v_remaining ELSE 0 END,
+           CASE WHEN v_is_roaming AND v_service_type = 'voice' THEN v_remaining ELSE 0 END,
+           CASE WHEN v_is_roaming AND v_service_type = 'data'  THEN v_remaining ELSE 0 END,
+           CASE WHEN v_is_roaming AND v_service_type = 'sms'   THEN v_remaining ELSE 0 END
        )
     ON CONFLICT (contract_id, rateplan_id) DO UPDATE SET
     voice = ror_contract.voice + EXCLUDED.voice,
                                                   data  = ror_contract.data  + EXCLUDED.data,
-                                                  sms   = ror_contract.sms   + EXCLUDED.sms;
+                                                  sms   = ror_contract.sms   + EXCLUDED.sms,
+                                                  roam_voice = ror_contract.roam_voice + EXCLUDED.roam_voice,
+                                                  roam_data  = ror_contract.roam_data  + EXCLUDED.roam_data,
+                                                  roam_sms   = ror_contract.roam_sms   + EXCLUDED.roam_sms;
 
 -- Deduct overage charge from available credit
 UPDATE contract
@@ -344,6 +364,7 @@ CREATE OR REPLACE FUNCTION generate_bill(p_contract_id INTEGER, p_billing_period
                v_total_amount NUMERIC(12,2);
                v_rateplan_id INTEGER;
                v_bill_id INTEGER;
+               v_roaming_multiplier NUMERIC := 2;
 BEGIN
                v_billing_period_end := (DATE_TRUNC('month', p_billing_period_start) + INTERVAL '1 month - 1 day')::DATE;
                 -- Load rateplan_id for convenience
@@ -369,7 +390,14 @@ WHERE cc.contract_id = p_contract_id
   AND cc.ending_date = v_billing_period_end
   AND cc.is_billed = FALSE;
 SELECT COALESCE(
-               (rc.data * rp.ror_data) + (rc.voice * rp.ror_voice) + (rc.sms * rp.ror_sms),0) INTO v_ROR_charge
+               (rc.data * rp.ror_data) +
+               (rc.voice * rp.ror_voice) +
+               (rc.sms * rp.ror_sms) +
+               (rc.roam_data * rp.ror_data * v_roaming_multiplier) +
+               (rc.roam_voice * rp.ror_voice * v_roaming_multiplier) +
+               (rc.roam_sms * rp.ror_sms * v_roaming_multiplier),
+               0
+               ) INTO v_ROR_charge
 FROM ror_contract rc
          JOIN rateplan rp ON rp.id = rc.rateplan_id
 WHERE contract_id = p_contract_id
@@ -510,8 +538,8 @@ INSERT INTO contract (
     RETURNING id INTO v_contract_id;
 
 -- Initialize an empty ror_contract row for this contract
-INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms)
-VALUES (v_contract_id, p_rateplan_id, 0, 0, 0);
+INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms, roam_voice, roam_data, roam_sms)
+VALUES (v_contract_id, p_rateplan_id, 0, 0, 0, 0, 0, 0);
 
 -- Initialize consumption rows for the current billing period
 v_period_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
@@ -1284,8 +1312,8 @@ SET rateplan_id = p_new_rateplan_id
 WHERE id = p_contract_id;
 
 -- Fresh ror_contract row for new rateplan
-INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms)
-VALUES (p_contract_id, p_new_rateplan_id, 0, 0, 0)
+INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms, roam_voice, roam_data, roam_sms)
+VALUES (p_contract_id, p_new_rateplan_id, 0, 0, 0, 0, 0, 0)
     ON CONFLICT DO NOTHING;
 
 -- Fresh consumption rows for new rateplan starting today

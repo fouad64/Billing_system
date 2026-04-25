@@ -221,7 +221,7 @@ RETURN CASE p_service_type
            WHEN 'voice' THEN CEIL(p_duration / 60.0)  -- convert seconds to minutes, round up
            WHEN 'data'  THEN p_duration
            WHEN 'sms'   THEN 1
-           WHEN 'free_units' THEN 1
+           WHEN 'free_units' THEN p_duration
     END;
 END;
 $$ LANGUAGE plpgsql;
@@ -1065,7 +1065,7 @@ $$ LANGUAGE plpgsql;
 -- In a real system, you'd likely have a separate service that queries the bill data
 -- ------------------------------------------------------------
 
-   CREATE OR REPLACE FUNCTION get_bill(p_bill_id INTEGER)
+CREATE OR REPLACE FUNCTION get_bill(p_bill_id INTEGER)
 RETURNS TABLE (
     contract_id INTEGER,
     billing_period_start DATE,
@@ -1100,10 +1100,9 @@ SELECT
     b.status,
     b.is_paid
 FROM bill b
-WHERE id = p_bill_id;
+WHERE b.id = p_bill_id;
 END;
 $$ LANGUAGE plpgsql;
-
 -- ------------------------------------------------------------
 -- MARK BILL AS PAID
 -- ------------------------------------------------------------

@@ -116,9 +116,12 @@ CREATE TABLE contract_consumption (
 CREATE TABLE ror_contract (
                               contract_id INTEGER NOT NULL REFERENCES contract(id),
                               rateplan_id INTEGER NOT NULL REFERENCES rateplan(id),
-                              data        INTEGER,
-                              voice       INTEGER,
-                              sms         INTEGER,
+                              data        INTEGER NOT NULL DEFAULT 0,
+                              voice       INTEGER NOT NULL DEFAULT 0,
+                              sms         INTEGER NOT NULL DEFAULT 0,
+                              roam_data   INTEGER NOT NULL DEFAULT 0,
+                              roam_voice  INTEGER NOT NULL DEFAULT 0,
+                              roam_sms    INTEGER NOT NULL DEFAULT 0,
                               PRIMARY KEY (contract_id, rateplan_id)
     -- bill_id added after bill table below (FK added via ALTER)
 );
