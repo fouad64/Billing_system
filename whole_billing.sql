@@ -2069,7 +2069,8 @@ VALUES
 INSERT INTO rateplan (name, ror_data, ror_voice, ror_sms, price)
 VALUES
     ('Basic',   0.10, 0.20, 0.05, 50),
-    ('Premium', 0.05, 0.10, 0.02, 120);
+    ('Premium Gold', 0.05, 0.10, 0.02, 120),
+    ('Elite Enterprise', 0.02, 0.05, 0.01, 349);
 
 ------------------------------------------------------------
 -- SERVICE PACKAGES
@@ -2091,7 +2092,9 @@ INSERT INTO rateplan_service_package (rateplan_id, service_package_id)
 VALUES
     (1, 1), (1, 3),
     (2, 1), (2, 2), (2, 3), (2, 4),
-    (2, 5), (2, 6), (2, 7);
+    (2, 5), (2, 6), (2, 7),
+    (3, 1), (3, 2), (3, 3), (3, 4),
+    (3, 5), (3, 6), (3, 7);
 
 ------------------------------------------------------------
 -- CONTRACTS
