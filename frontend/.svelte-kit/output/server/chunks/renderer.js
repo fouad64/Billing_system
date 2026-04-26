@@ -1,4 +1,4 @@
-import { l as lifecycle_outside_component, B as BROWSER, i as invalid_csp, a as await_invalid, g as get_render_context, b as invalid_id_prefix } from "./render-context.js";
+import { l as lifecycle_outside_component, D as DEV, i as invalid_csp, a as await_invalid, g as get_render_context, b as invalid_id_prefix } from "./render-context.js";
 import { clsx as clsx$1 } from "clsx";
 import * as devalue from "devalue";
 var ssr_context = null;
@@ -2084,7 +2084,7 @@ function update_effect(effect) {
     effect.teardown = typeof teardown === "function" ? teardown : null;
     effect.wv = write_version;
     var dep;
-    if (BROWSER && tracing_mode_flag && (effect.f & DIRTY) !== 0 && effect.deps !== null) ;
+    if (DEV && tracing_mode_flag && (effect.f & DIRTY) !== 0 && effect.deps !== null) ;
   } finally {
     is_updating_effect = was_updating_effect;
     active_effect = previous_effect;
