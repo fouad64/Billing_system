@@ -4,6 +4,7 @@ function _page($$renderer, $$props) {
     let contractId = "";
     let missingBills = [];
     let processingBills = false;
+    let selectedIds = /* @__PURE__ */ new Set();
     head("sycr78", $$renderer2, ($$renderer3) => {
       $$renderer3.title(($$renderer4) => {
         $$renderer4.push(`<title>Billing — FMRZ Admin</title>`);
@@ -20,6 +21,13 @@ function _page($$renderer, $$props) {
     }
     $$renderer2.push(`<!--]--> <div class="search-bar animate-fade"><div style="display:flex;gap:1rem;margin-bottom:2rem"><div class="input-wrapper" style="flex:1; max-width: 300px;"><input class="input" placeholder="Filter by Contract ID..."${attr("value", contractId)} type="number"/></div> <button class="btn btn-primary">Search Records</button> `);
     {
+      $$renderer2.push("<!--[-1-->");
+    }
+    $$renderer2.push(`<!--]--> `);
+    if (selectedIds.size > 0) {
+      $$renderer2.push("<!--[0-->");
+      $$renderer2.push(`<button class="btn btn-primary animate-fade" style="background: #22C55E; margin-left: auto;">Mark ${escape_html(selectedIds.size)} Selected as Paid</button>`);
+    } else {
       $$renderer2.push("<!--[-1-->");
     }
     $$renderer2.push(`<!--]--></div></div> `);

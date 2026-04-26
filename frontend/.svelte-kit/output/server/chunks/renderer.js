@@ -1,4 +1,4 @@
-import { l as lifecycle_outside_component, B as BROWSER, i as invalid_csp, a as await_invalid, g as get_render_context, b as invalid_id_prefix } from "./render-context.js";
+import { l as lifecycle_outside_component, D as DEV, i as invalid_csp, a as await_invalid, g as get_render_context, b as invalid_id_prefix } from "./render-context.js";
 import { clsx as clsx$1 } from "clsx";
 import * as devalue from "devalue";
 var ssr_context = null;
@@ -1303,7 +1303,7 @@ function mark_reactions(signal, status, updated_during_traversal) {
       );
       batch_values?.delete(derived2);
       if ((flags & WAS_MARKED) === 0) {
-        if (flags & CONNECTED && (active_effect === null || (active_effect.f & REACTION_IS_UPDATING) === 0)) {
+        if (flags & CONNECTED) {
           reaction.f |= WAS_MARKED;
         }
         mark_reactions(derived2, MAYBE_DIRTY, updated_during_traversal);
@@ -2084,7 +2084,7 @@ function update_effect(effect) {
     effect.teardown = typeof teardown === "function" ? teardown : null;
     effect.wv = write_version;
     var dep;
-    if (BROWSER && tracing_mode_flag && (effect.f & DIRTY) !== 0 && effect.deps !== null) ;
+    if (DEV && tracing_mode_flag && (effect.f & DIRTY) !== 0 && effect.deps !== null) ;
   } finally {
     is_updating_effect = was_updating_effect;
     active_effect = previous_effect;
@@ -3168,13 +3168,13 @@ export {
   setContext as ab,
   derived as ac,
   attr_class as b,
-  safe_not_equal as c,
-  ensure_array_like as d,
+  ensure_array_like as c,
+  attr_style as d,
   escape_html as e,
-  attr_style as f,
+  stringify as f,
   getContext as g,
   head as h,
-  stringify as i,
+  safe_not_equal as i,
   hydration_mismatch as j,
   HYDRATION_END as k,
   HYDRATION_START as l,

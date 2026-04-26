@@ -16,19 +16,31 @@ public class AdminContractServlet extends BaseServlet {
         handle(res, () -> {
             String path = req.getPathInfo();
             if (path == null || "/".equals(path)) {
+                String msisdn = req.getParameter("msisdn");
+                if (msisdn != null && !msisdn.trim().isEmpty()) {
+                    String sql = "SELECT c.id, c.msisdn, c.status, c.available_credit as \"availableCredit\", " +
+                                 "ua.name as \"customerName\", r.name as \"rateplanName\" " +
+                                 "FROM contract c " +
+                                 "JOIN user_account ua ON c.user_account_id = ua.id " +
+                                 "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
+                                 "WHERE c.msisdn = ? " +
+                                 "ORDER BY c.id DESC";
+                    return DB.executeSelect(sql, msisdn);
+                }
+                
                 String sql = "SELECT c.id, c.msisdn, c.status, c.available_credit as \"availableCredit\", " +
-                             "cust.name as \"customerName\", r.name as \"rateplanName\" " +
+                             "ua.name as \"customerName\", r.name as \"rateplanName\" " +
                              "FROM contract c " +
-                             "JOIN customer cust ON c.customer_id = cust.id " +
+                             "JOIN user_account ua ON c.user_account_id = ua.id " +
                              "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
                              "ORDER BY c.id DESC";
                 return DB.executeSelect(sql);
             } else {
                 int id = Integer.parseInt(path.substring(1));
-                String sql = "SELECT c.*, cust.name as \"customerName\", r.name as \"rateplanName\", " +
+                String sql = "SELECT c.*, ua.name as \"customerName\", r.name as \"rateplanName\", " +
                              "c.available_credit as \"availableCredit\" " +
                              "FROM contract c " +
-                             "JOIN customer cust ON c.customer_id = cust.id " +
+                             "JOIN user_account ua ON c.user_account_id = ua.id " +
                              "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
                              "WHERE c.id = ?";
                 List<Map<String, Object>> list = DB.executeSelect(sql, id);

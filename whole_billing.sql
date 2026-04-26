@@ -28,6 +28,15 @@ CREATE TABLE user_account (
 );
 
 -- ------------------------------------------------------------
+-- MSISDN POOL
+-- ------------------------------------------------------------
+CREATE TABLE msisdn_pool (
+                             id          SERIAL PRIMARY KEY,
+                             msisdn      VARCHAR(20) NOT NULL UNIQUE,
+                             is_available BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- ------------------------------------------------------------
 -- CUSTOMER
 -- ------------------------------------------------------------
 -- CREATE TABLE customer (
@@ -183,6 +192,21 @@ CREATE TABLE cdr (
                      rated_flag       BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+-- ------------------------------------------------------------
+-- CUSTOMER ADD-ONS
+-- Tracks extra service packages purchased by a customer
+-- on top of their existing contract/rateplan
+-- ------------------------------------------------------------
+CREATE TABLE contract_addon (
+                                id                 SERIAL PRIMARY KEY,
+                                contract_id        INTEGER NOT NULL REFERENCES contract(id),
+                                service_package_id INTEGER NOT NULL REFERENCES service_package(id),
+                                purchased_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+                                expiry_date        DATE NOT NULL,
+                                is_active          BOOLEAN NOT NULL DEFAULT TRUE,
+                                price_paid         NUMERIC(12,2) NOT NULL DEFAULT 0
+);
+
 
 -- ============================================================
 -- INDEXES (performance basics)
@@ -195,7 +219,8 @@ CREATE INDEX idx_contract_user_account  ON contract(user_account_id);
 CREATE INDEX idx_bill_contract      ON bill(contract_id);
 CREATE INDEX idx_bill_billing_date  ON bill(billing_date);
 CREATE INDEX idx_invoice_bill       ON invoice(bill_id);
-
+CREATE INDEX idx_addon_contract ON contract_addon(contract_id);
+CREATE INDEX idx_addon_active   ON contract_addon(contract_id, is_active);
 -- ============================================================
 -- FUNCTIONS (for billing calculations, etc.)
 -- ============================================================
@@ -633,110 +658,129 @@ $$ LANGUAGE plpgsql;
 -- at the end of each billing period.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION generate_all_bills(p_period_start DATE)
-RETURNS VOID AS $$
+    RETURNS VOID AS $$
 DECLARE
-v_contract RECORD;
+    v_contract RECORD;
     v_success  INTEGER := 0;
     v_failed   INTEGER := 0;
 BEGIN
-FOR v_contract IN
-SELECT id FROM contract WHERE status = 'active'
-    LOOP
-BEGIN
-            PERFORM generate_bill(v_contract.id, p_period_start);
-            v_success := v_success + 1;
-EXCEPTION
-            WHEN OTHERS THEN
-                -- Log failure but continue processing remaining contracts
-                RAISE WARNING 'generate_bill failed for contract %: %', v_contract.id, SQLERRM;
-                v_failed := v_failed + 1;
-END;
-END LOOP;
+    -- Expire any add-ons from last period first
+    PERFORM expire_addons();
 
-    RAISE NOTICE 'generate_all_bills complete: % succeeded, % failed', v_success, v_failed;
+    FOR v_contract IN
+        SELECT id FROM contract WHERE status = 'active'
+        LOOP
+            BEGIN
+                PERFORM generate_bill(v_contract.id, p_period_start);
+                v_success := v_success + 1;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    RAISE WARNING 'generate_bill failed for contract %: %',
+                        v_contract.id, SQLERRM;
+                    v_failed := v_failed + 1;
+            END;
+        END LOOP;
+
+    RAISE NOTICE 'generate_all_bills complete: % succeeded, % failed',
+        v_success, v_failed;
 END;
 $$ LANGUAGE plpgsql;
-
+-- ------------------------------------------------------------
+-- GET BILLS THAT ARE MISSING (contracts with no bill this period)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_missing_bills()
+    RETURNS TABLE (
+                      contract_id    INTEGER,
+                      msisdn         VARCHAR(20),
+                      customer_name  VARCHAR(255),
+                      rateplan_name  VARCHAR(255)
+                  ) AS $$
+DECLARE
+    v_period_start DATE := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+BEGIN
+    RETURN QUERY
+        SELECT
+            c.id           AS contract_id,
+            c.msisdn,
+            u.name         AS customer_name,
+            r.name         AS rateplan_name
+        FROM contract c
+                 JOIN user_account u ON c.user_account_id = u.id
+                 LEFT JOIN rateplan r ON c.rateplan_id = r.id
+        WHERE c.status = 'active'
+          AND NOT EXISTS (
+            SELECT 1 FROM bill b
+            WHERE b.contract_id = c.id
+              AND b.billing_period_start = v_period_start
+        )
+        ORDER BY c.id;
+END;
+$$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 -- CREATE CONTRACT
 -- Creates a new contract and immediately initializes
 -- consumption rows for the current billing period.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION create_contract(
-    p_user_account_id    INTEGER,
-    p_rateplan_id    INTEGER,
-    p_msisdn         VARCHAR(20),
-    p_credit_limit   NUMERIC(12,2)
+    p_user_account_id  INTEGER,
+    p_rateplan_id      INTEGER,
+    p_msisdn           VARCHAR(20),
+    p_credit_limit     DOUBLE PRECISION
 )
-RETURNS INTEGER AS $$
+    RETURNS INTEGER AS $$
 DECLARE
-v_contract_id  INTEGER;
+    v_contract_id  INTEGER;
     v_period_start DATE;
     v_period_end   DATE;
 BEGIN
-    -- Validate customer exists
     IF NOT EXISTS (SELECT 1 FROM user_account WHERE id = p_user_account_id) THEN
         RAISE EXCEPTION 'Customer with id % does not exist', p_user_account_id;
-END IF;
+    END IF;
 
-    -- Validate rateplan exists
     IF NOT EXISTS (SELECT 1 FROM rateplan WHERE id = p_rateplan_id) THEN
         RAISE EXCEPTION 'Rateplan with id % does not exist', p_rateplan_id;
-END IF;
+    END IF;
 
-    -- Validate MSISDN is not already taken
     IF EXISTS (SELECT 1 FROM contract WHERE msisdn = p_msisdn) THEN
         RAISE EXCEPTION 'MSISDN % is already assigned to another contract', p_msisdn;
-END IF;
+    END IF;
 
-    -- Insert contract
-INSERT INTO contract (
-    user_account_id,
-    rateplan_id,
-    msisdn,
-    status,
-    credit_limit,
-    available_credit
-) VALUES (
-             p_user_account_id,
-             p_rateplan_id,
-             p_msisdn,
-             'active',
-             p_credit_limit,
-             p_credit_limit   -- available starts equal to limit
-         )
-    RETURNING id INTO v_contract_id;
+    -- Check MSISDN is actually available in the pool
+    IF NOT EXISTS (
+        SELECT 1 FROM msisdn_pool
+        WHERE msisdn = p_msisdn AND is_available = TRUE
+    ) THEN
+        RAISE EXCEPTION 'MSISDN % is not available', p_msisdn;
+    END IF;
 
--- Initialize an empty ror_contract row for this contract
-INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms)
-VALUES (v_contract_id, p_rateplan_id, 0, 0, 0);
+    INSERT INTO contract (
+        user_account_id, rateplan_id, msisdn,
+        status, credit_limit, available_credit
+    ) VALUES (
+                 p_user_account_id, p_rateplan_id, p_msisdn,
+                 'active', p_credit_limit::NUMERIC, p_credit_limit::NUMERIC
+             ) RETURNING id INTO v_contract_id;
 
--- Initialize consumption rows for the current billing period
-v_period_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+    -- Mark MSISDN as taken
+    PERFORM mark_msisdn_taken(p_msisdn);
+
+    INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms)
+    VALUES (v_contract_id, p_rateplan_id, 0, 0, 0);
+
+    v_period_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
     v_period_end   := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day')::DATE;
 
-INSERT INTO contract_consumption (
-    contract_id,
-    service_package_id,
-    rateplan_id,
-    starting_date,
-    ending_date,
-    consumed,
-    is_billed
-)
-SELECT
-    v_contract_id,
-    rsp.service_package_id,
-    p_rateplan_id,
-    v_period_start,
-    v_period_end,
-    0,
-    FALSE
-FROM rateplan_service_package rsp
-WHERE rsp.rateplan_id = p_rateplan_id
+    INSERT INTO contract_consumption (
+        contract_id, service_package_id, rateplan_id,
+        starting_date, ending_date, consumed, is_billed
+    )
+    SELECT v_contract_id, rsp.service_package_id, p_rateplan_id,
+           v_period_start, v_period_end, 0, FALSE
+    FROM rateplan_service_package rsp
+    WHERE rsp.rateplan_id = p_rateplan_id
     ON CONFLICT DO NOTHING;
 
-RETURN v_contract_id;
+    RETURN v_contract_id;
 
 EXCEPTION
     WHEN OTHERS THEN
@@ -868,28 +912,27 @@ $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 -- AUTHENTICATE LOGIN
 -- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION login(p_username     VARCHAR(255), p_password VARCHAR(30))
+CREATE OR REPLACE FUNCTION login(p_username VARCHAR(255), p_password VARCHAR(30))
     RETURNS TABLE (
-                      user_account_id INTEGER,
+                      id       INTEGER,
                       username VARCHAR(255),
-                      name VARCHAR(255),
-                      email VARCHAR(255),
-                      role user_role
+                      name     VARCHAR(255),
+                      email    VARCHAR(255),
+                      role     user_role
                   ) AS $$
-    BEGIN
-        RETURN QUERY
-            SELECT
-                ua.id,
-                ua.username,
-                ua.name,
-                ua.email,
-                ua.role
+BEGIN
+    RETURN QUERY
+        SELECT
+            ua.id,
+            ua.username,
+            ua.name,
+            ua.email,
+            ua.role
         FROM user_account ua
-        WHERE
-            ua.password = p_password
-        AND ua.username = p_username;
-        END;
-    $$ LANGUAGE plpgsql;
+        WHERE ua.username = p_username
+          AND ua.password = p_password;
+END;
+$$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 -- GET CDRs (paginated)
 -- ------------------------------------------------------------
@@ -1151,16 +1194,30 @@ $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 -- CHANGE CONTRACT STATUS
 -- ------------------------------------------------------------
-    CREATE OR REPLACE FUNCTION change_contract_status(p_contract_id INTEGER, p_status contract_status)
-           RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION change_contract_status(
+    p_contract_id INTEGER,
+    p_status      contract_status
+)
+    RETURNS VOID AS $$
+DECLARE
+    v_msisdn VARCHAR(20);
 BEGIN
-UPDATE contract SET status = p_status WHERE id = p_contract_id;
+    SELECT msisdn INTO v_msisdn
+    FROM contract WHERE id = p_contract_id;
+
+    UPDATE contract SET status = p_status WHERE id = p_contract_id;
+
+    -- Release number back to pool if terminated
+    IF p_status = 'terminated' THEN
+        PERFORM release_msisdn(v_msisdn);
+    END IF;
+
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE EXCEPTION 'terminate_contract failed for contract id %: %', p_contract_id, SQLERRM;
+        RAISE EXCEPTION 'change_contract_status failed for contract id %: %',
+            p_contract_id, SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
-
 -- ------------------------------------------------------------
 -- GET CONTRACT CONSUMPTION
 -- ------------------------------------------------------------
@@ -1226,6 +1283,56 @@ EXCEPTION
         RAISE EXCEPTION 'create_customer failed for username %: %', p_username, SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- GET AVAILABLE MSISDNs
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_available_msisdns()
+    RETURNS TABLE (
+                      id     INTEGER,
+                      msisdn VARCHAR(20)
+                  ) AS $$
+BEGIN
+    RETURN QUERY
+        SELECT mp.id, mp.msisdn
+        FROM msisdn_pool mp
+        WHERE mp.is_available = TRUE
+        ORDER BY mp.msisdn;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- MARK MSISDN AS TAKEN
+-- Called automatically when a contract is created
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION mark_msisdn_taken(p_msisdn VARCHAR(20))
+    RETURNS VOID AS $$
+BEGIN
+    UPDATE msisdn_pool
+    SET is_available = FALSE
+    WHERE msisdn = p_msisdn;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'MSISDN % not found in pool', p_msisdn;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ------------------------------------------------------------
+-- MARK MSISDN AS AVAILABLE AGAIN
+-- Called when a contract is terminated
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION release_msisdn(p_msisdn VARCHAR(20))
+    RETURNS VOID AS $$
+BEGIN
+    UPDATE msisdn_pool
+    SET is_available = TRUE
+    WHERE msisdn = p_msisdn;
+END;
+$$ LANGUAGE plpgsql;
+
 
 -- ------------------------------------------------------------
 -- CREATE ADMIN
@@ -1710,6 +1817,198 @@ BEGIN
         WHERE ua.id = p_id AND ua.role = 'customer';
 END;
 $$ LANGUAGE plpgsql;
+-- --------------------------------------------------
+-- DASHBOARD STATS
+-- --------------------------------------------------
+CREATE OR REPLACE FUNCTION get_dashboard_stats()
+    RETURNS TABLE (
+                      total_customers  BIGINT,
+                      total_contracts  BIGINT,
+                      active_contracts BIGINT,
+                      total_cdrs       BIGINT
+                  ) AS $$
+BEGIN
+    RETURN QUERY
+        SELECT
+            (SELECT COUNT(*) FROM user_account  WHERE role = 'customer'),
+            (SELECT COUNT(*) FROM contract),
+            (SELECT COUNT(*) FROM contract      WHERE status = 'active'),
+            (SELECT COUNT(*) FROM cdr);
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- PURCHASE ADD-ON
+-- Customer buys an extra service package
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION purchase_addon(
+    p_contract_id        INTEGER,
+    p_service_package_id INTEGER
+)
+    RETURNS INTEGER AS $$
+DECLARE
+    v_addon_id     INTEGER;
+    v_pkg_price    NUMERIC(12,2);
+    v_pkg_amount   NUMERIC(12,4);
+    v_pkg_type     service_type;
+    v_expiry       DATE;
+    v_period_start DATE;
+    v_period_end   DATE;
+BEGIN
+    -- Validate contract exists and is active
+    IF NOT EXISTS (
+        SELECT 1 FROM contract WHERE id = p_contract_id AND status = 'active'
+    ) THEN
+        RAISE EXCEPTION 'Contract % is not active', p_contract_id;
+    END IF;
+
+    -- Validate service package exists
+    SELECT price, amount, type
+    INTO v_pkg_price, v_pkg_amount, v_pkg_type
+    FROM service_package
+    WHERE id = p_service_package_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Service package % not found', p_service_package_id;
+    END IF;
+
+    -- Check not already active
+    IF EXISTS (
+        SELECT 1 FROM contract_addon
+        WHERE contract_id        = p_contract_id
+          AND service_package_id = p_service_package_id
+          AND is_active          = TRUE
+    ) THEN
+        RAISE EXCEPTION 'Add-on already active for this contract';
+    END IF;
+
+    -- Check customer has enough credit
+    IF NOT EXISTS (
+        SELECT 1 FROM contract
+        WHERE id = p_contract_id
+          AND available_credit >= COALESCE(v_pkg_price, 0)
+    ) THEN
+        RAISE EXCEPTION 'Insufficient credit to purchase add-on';
+    END IF;
+
+    -- Expiry = end of current billing month
+    v_expiry := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day')::DATE;
+
+    -- Insert addon record
+    INSERT INTO contract_addon (
+        contract_id, service_package_id,
+        purchased_date, expiry_date,
+        is_active, price_paid
+    ) VALUES (
+                 p_contract_id, p_service_package_id,
+                 CURRENT_DATE, v_expiry,
+                 TRUE, COALESCE(v_pkg_price, 0)
+             ) RETURNING id INTO v_addon_id;
+
+    -- Deduct price from available credit
+    UPDATE contract
+    SET available_credit = available_credit - COALESCE(v_pkg_price, 0)
+    WHERE id = p_contract_id;
+
+    -- Add consumption row so rate_cdr can deduct from it
+    v_period_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+    v_period_end   := v_expiry;
+
+    INSERT INTO contract_consumption (
+        contract_id, service_package_id, rateplan_id,
+        starting_date, ending_date, consumed, is_billed
+    )
+    SELECT
+        p_contract_id,
+        p_service_package_id,
+        c.rateplan_id,
+        v_period_start,
+        v_period_end,
+        0,
+        FALSE
+    FROM contract c
+    WHERE c.id = p_contract_id
+    ON CONFLICT DO NOTHING;
+
+    RETURN v_addon_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'purchase_addon failed: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- CANCEL ADD-ON
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION cancel_addon(p_addon_id INTEGER)
+    RETURNS VOID AS $$
+BEGIN
+    UPDATE contract_addon
+    SET is_active = FALSE
+    WHERE id = p_addon_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Add-on % not found', p_addon_id;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'cancel_addon failed: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- GET ACTIVE ADD-ONS FOR A CONTRACT
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_contract_addons(p_contract_id INTEGER)
+    RETURNS TABLE (
+                      id                 INTEGER,
+                      service_package_id INTEGER,
+                      package_name       VARCHAR(255),
+                      type               service_type,
+                      amount             NUMERIC(12,4),
+                      purchased_date     DATE,
+                      expiry_date        DATE,
+                      price_paid         NUMERIC(12,2),
+                      is_active          BOOLEAN
+                  ) AS $$
+BEGIN
+    RETURN QUERY
+        SELECT
+            ca.id,
+            ca.service_package_id,
+            sp.name        AS package_name,
+            sp.type,
+            sp.amount,
+            ca.purchased_date,
+            ca.expiry_date,
+            ca.price_paid,
+            ca.is_active
+        FROM contract_addon ca
+                 JOIN service_package sp ON sp.id = ca.service_package_id
+        WHERE ca.contract_id = p_contract_id
+        ORDER BY ca.purchased_date DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- AUTO-EXPIRE ADD-ONS AT END OF BILLING PERIOD
+-- Call this at the start of each new billing cycle
+-- or add it inside generate_all_bills
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION expire_addons()
+    RETURNS VOID AS $$
+BEGIN
+    UPDATE contract_addon
+    SET is_active = FALSE
+    WHERE expiry_date < CURRENT_DATE
+      AND is_active   = TRUE;
+END;
+$$ LANGUAGE plpgsql;
 -- =========================================================
 -- DUMMY DATA
 -- For testing and demonstration purposes
@@ -1881,3 +2180,15 @@ INSERT INTO invoice (bill_id, pdf_path)
 VALUES
     (1, '/tmp/invoice_march_1.pdf'),
     (2, '/tmp/invoice_march_2.pdf');
+
+------------------------------------------------------------
+-- Pre-populate with a range of numbers
+------------------------------------------------------------
+INSERT INTO msisdn_pool (msisdn)
+SELECT '2010000' || LPAD(i::TEXT, 5, '0')
+FROM generate_series(1, 99) AS i;
+
+-- Mark MSISDNs already used by contracts as unavailable
+UPDATE msisdn_pool
+SET is_available = FALSE
+WHERE msisdn IN (SELECT msisdn FROM contract);

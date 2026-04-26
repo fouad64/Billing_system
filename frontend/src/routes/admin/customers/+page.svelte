@@ -1,50 +1,41 @@
 <script>
   let customers = $state([]);
   let search = $state('');
-  let loading = $state(true);
   let showModal = $state(false);
-  let newCustomer = $state({ name: '', email: '', msisdn: '', address: '', birthdate: '' });
-  let error = $state('');
   let showSuccess = $state(false);
+  let error = $state('');
+  let newCustomer = $state({ name: '', email: '', msisdn: '', address: '', birthdate: '' });
 
   async function load() {
-    loading = true;
-    const url = search ? `/api/admin/customers?q=${encodeURIComponent(search)}` : '/api/admin/customers';
-    try { 
-      const res = await fetch(url, { credentials: 'include' }); 
-      if (res.ok) customers = await res.json(); 
-    } catch {}
-    loading = false;
+    const res = await fetch(`/api/admin/customers?search=${search}`);
+    if (res.ok) customers = await res.json();
   }
 
   async function createCustomer(e) {
     e.preventDefault();
-    error = '';
-    try {
-      const res = await fetch('/api/admin/customers', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        credentials: 'include', 
-        body: JSON.stringify(newCustomer) 
-      });
-      if (res.ok) { 
-        showModal = false; 
-        showSuccess = true;
-        newCustomer = { name: '', email: '', msisdn: '', address: '', birthdate: '' }; 
-        load(); 
-      } else {
-        const data = await res.json();
-        error = data.message || 'Failed to create customer';
-      }
-    } catch (err) {
-      error = 'Network error. Please try again.';
+    const res = await fetch('/api/admin/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCustomer)
+    });
+    if (res.ok) {
+      showModal = false;
+      showSuccess = true;
+      newCustomer = { name: '', email: '', msisdn: '', address: '', birthdate: '' };
+      load();
+    } else {
+      const msg = await res.text();
+      error = msg || 'Failed to create customer';
     }
   }
 
   $effect(() => { load(); });
 </script>
 
-<svelte:head><title>Customers — FMRZ Admin</title></svelte:head>
+<svelte:head>
+  <title>Customers — FMRZ</title>
+</svelte:head>
+
 <div class="container">
   <div class="page-header">
     <h1>Customer <span class="text-gradient">Directory</span></h1>
@@ -53,13 +44,21 @@
   
   <div class="search-bar animate-fade">
     <div style="display:flex;gap:1rem">
-      <input class="input" style="width:250px" placeholder="Search by name or email..." bind:value={search} oninput={() => setTimeout(load, 300)} aria-label="Search customers" />
-      <button class="btn btn-primary" onclick={() => { showModal = true; error = ''; }}>+ Add New Customer</button>
+      <div class="relative group" style="position: relative;">
+        <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b;">
+           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input class="input" style="width:300px; padding-left: 2.5rem;" placeholder="Search directory..." bind:value={search} oninput={() => setTimeout(load, 300)} aria-label="Search customers" />
+      </div>
+      <button class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.5rem;" onclick={() => { showModal = true; error = ''; }}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        Add New Customer
+      </button>
     </div>
   </div>
 
-  <div class="table-wrapper card card-static animate-fade" style="margin-top: 0; border: 1px solid var(--border); border-radius: 20px; overflow: hidden;">
-    <table style="border: none;">
+  <div class="table-wrapper static-table animate-fade">
+    <table>
       <thead>
         <tr><th>ID</th><th>MSISDN</th><th>Name</th><th>Email</th><th>Address</th><th>Birthdate</th></tr>
       </thead>
@@ -67,11 +66,11 @@
         {#each customers as c}
           <tr>
             <td><span class="id-badge">#{c.id}</span></td>
-            <td><span class="phone-num">{c.msisdn}</span></td>
-            <td class="customer-name">{c.name}</td>
-            <td class="meta-info">{c.email||'—'}</td>
-            <td class="meta-info">{c.address||'—'}</td>
-            <td class="meta-info">{c.birthdate||'—'}</td>
+            <td><span class="phone-num" style="color: var(--red) !important;">{c.msisdn}</span></td>
+            <td class="customer-name" style="color: #FFFFFF !important;">{c.name}</td>
+            <td style="color: #94A3B8 !important; font-size: 0.9rem; font-weight: 500;">{c.email||'—'}</td>
+            <td style="color: #FB7185 !important; font-size: 0.9rem; font-weight: 500;">{c.address||'—'}</td>
+            <td style="color: #64748B !important; font-size: 0.9rem; font-weight: 600;">{c.birthdate||'—'}</td>
           </tr>
         {/each}
       </tbody>
@@ -135,23 +134,33 @@
 {/if}
 
 <style>
-  .table-card { 
-    padding: 0; 
-    overflow: hidden; 
-    border-radius: 20px; 
+  .static-table {
+    margin-top: 2rem;
+    background: rgba(15, 15, 25, 0.6);
     border: 1px solid var(--border);
-    background: var(--bg-card);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: none !important;
+    transform: none !important;
+    box-shadow: var(--shadow-premium);
   }
-  .table-card .table-wrapper {
-    border: none;
-    background: transparent;
-    margin-top: 0;
-  }
-  .id-badge { background: rgba(255, 255, 255, 0.05); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; color: #64748b; }
-  .phone-num { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #3B82F6 !important; }
-  .customer-name { font-weight: 600; color: #ffffff !important; }
-  .meta-info { color: #94a3b8 !important; font-size: 0.9rem; }
   
+  .static-table:hover {
+    background: rgba(15, 15, 25, 0.6) !important;
+    transform: none !important;
+    border-color: var(--border) !important;
+    box-shadow: var(--shadow-premium) !important;
+  }
+
+  table { width: 100%; border-collapse: collapse; border: none; }
+  th { text-align: left; padding: 1rem; background: rgba(255, 255, 255, 0.05); color: #cbd5e1; font-weight: 600; border-bottom: 1px solid var(--border); }
+  td { padding: 1rem; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  
+  .id-badge { background: rgba(255, 255, 255, 0.05); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; color: #94a3b8; }
+  .phone-num { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .customer-name { font-weight: 700; font-size: 1.05rem; }
+
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:200; backdrop-filter:blur(8px); }
   .modal { width:100%; max-width:480px; padding:2.5rem; transform:none !important; }
 </style>
