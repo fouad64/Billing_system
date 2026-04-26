@@ -1,10 +1,31 @@
 <script>
   import { fade, fly } from 'svelte/transition';
+  import { page } from '$app/state';
   let plans = $state([]);
   let servicePkgs = $state([]);
   let loading = $state(true);
   let activeIndex = $state(1); // Default to Gold
   let interval;
+  let message = $state(null);
+  
+  // Real-time Session Logic
+  let currentUser = $state(null);
+  let authChecked = $state(false);
+
+  // Admin State
+  let showAdminModal = $state(false);
+  let selectedPkg = $state(null);
+  let adminTargetMsisdn = $state('');
+
+  async function checkAuth() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) currentUser = await res.json();
+    } catch (e) {
+      currentUser = null;
+    }
+    authChecked = true;
+  }
 
   async function loadData() {
     try {
@@ -19,6 +40,68 @@
       servicePkgs = [];
     }
     loading = false;
+  }
+
+  async function buyBundle(pkg) {
+    if (!authChecked) return;
+    
+    if (!currentUser) {
+      window.location.href = '/login?returnTo=/packages';
+      return;
+    }
+
+    if (currentUser.role === 'admin') {
+      selectedPkg = pkg;
+      showAdminModal = true;
+      return;
+    }
+
+    // Customer flow
+    executePurchase(null, pkg.id);
+  }
+
+  async function adminProvision() {
+    if (!adminTargetMsisdn) return showToast('Please enter an MSISDN', true);
+    
+    try {
+      const contractRes = await fetch(`/api/admin/contracts`);
+      const contracts = await contractRes.json();
+      const contract = contracts.find(c => c.msisdn === adminTargetMsisdn);
+      
+      if (!contract) return showToast('No active contract found for this MSISDN', true);
+      
+      executePurchase(contract.id, selectedPkg.id, true);
+    } catch (e) {
+      showToast('Error finding customer', true);
+    }
+  }
+
+  async function executePurchase(contractId, pkgId, isAdmin = false) {
+    const url = isAdmin ? '/api/admin/addons' : '/api/customer/addons';
+    const body = isAdmin ? { contractId, servicePackageId: pkgId } : { servicePackageId: pkgId };
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'Provisioning successful!');
+        showAdminModal = false;
+        adminTargetMsisdn = '';
+      } else {
+        showToast(data.message || 'Action failed', true);
+      }
+    } catch (e) {
+      showToast('Connection error', true);
+    }
+  }
+
+  function showToast(msg, isError = false) {
+    message = { text: msg, isError };
+    setTimeout(() => message = null, 4000);
   }
 
   function startCycle() {
@@ -55,6 +138,7 @@
   }
 
   $effect(() => {
+    checkAuth();
     loadData();
     startCycle();
     return () => stopCycle();
@@ -66,6 +150,37 @@
 </svelte:head>
 
 <div class="container">
+  {#if message}
+    <div class="toast {message.isError ? 'error' : 'success'}" in:fly={{ y: -20 }} out:fade>
+      {message.text}
+    </div>
+  {/if}
+
+  {#if showAdminModal}
+    <div class="admin-modal-overlay" transition:fade onclick={() => showAdminModal = false}>
+      <div class="admin-modal card" onclick={(e) => e.stopPropagation()} in:fly={{ y: 50 }}>
+        <div class="modal-header">
+          <h3>Provision <span class="text-gradient">Package</span></h3>
+          <p>Assign <strong>{selectedPkg?.name}</strong> to a customer</p>
+        </div>
+        <div class="modal-body">
+          <label for="msisdn">Target MSISDN</label>
+          <input 
+            type="text" 
+            id="msisdn" 
+            placeholder="e.g. 01012345678" 
+            bind:value={adminTargetMsisdn} 
+            class="admin-input"
+          />
+          <div class="modal-actions">
+            <button class="btn btn-secondary" onclick={() => showAdminModal = false}>Cancel</button>
+            <button class="btn btn-primary" onclick={adminProvision}>Confirm Provision</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <div class="page-header">
     <div>
       <h1>Rate Plans & <span class="text-gradient">Packages</span></h1>
@@ -125,11 +240,23 @@
                   </div>
                 </div>
                 <button
-                  onclick={() => window.location.href = '/register?plan=' + plans[activeIndex]?.id}
+                  onclick={() => {
+                    if (!currentUser) window.location.href = '/register?plan=' + plans[activeIndex]?.id;
+                    else if (currentUser.role === 'admin') window.location.href = '/admin/contracts';
+                    else window.location.href = '/customer/dashboard';
+                  }}
                   class="btn btn-primary"
                   style="width: 100%; margin-top: 2rem; position: relative; z-index: 2;"
                 >
-                  Activate Now
+                  {#if !authChecked}
+                    Checking Status...
+                  {:else if !currentUser}
+                    Activate Now
+                  {:else if currentUser.role === 'admin'}
+                    Manage Contracts
+                  {:else}
+                    Back to Dashboard
+                  {/if}
                 </button>
               </div>
 
@@ -245,8 +372,20 @@
                <span class="quota-unit">{pkg.type === 'data' ? 'MB' : pkg.type === 'voice' ? 'Min' : 'SMS'}</span>
             </div>
 
-            <button class="btn btn-bundle-action" style="width: 100%; margin-top: 2rem;">
-              Add to Plan
+            <button 
+              onclick={() => buyBundle(pkg)}
+              class="btn btn-bundle-action" 
+              style="width: 100%; margin-top: 2rem;"
+            >
+              {#if !authChecked}
+                ...
+              {:else if !currentUser}
+                Login to Buy
+              {:else if currentUser.role === 'admin'}
+                Provision for Customer
+              {:else}
+                Add to Plan
+              {/if}
             </button>
           </div>
         {/each}
@@ -256,6 +395,35 @@
 </div>
 
 <style>
+  .toast {
+    position: fixed; top: 2rem; left: 50%; transform: translateX(-50%);
+    padding: 1rem 2rem; border-radius: 100px; z-index: 1000;
+    font-weight: 700; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .toast.success { background: rgba(16, 185, 129, 0.2); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+  .toast.error { background: rgba(224, 8, 0, 0.2); color: #ef4444; border-color: rgba(224, 8, 0, 0.4); }
+
+  /* Admin Modal */
+  .admin-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+    z-index: 2000; display: flex; align-items: center; justify-content: center;
+  }
+  .admin-modal {
+    width: 100%; max-width: 400px; padding: 2.5rem;
+    background: rgba(20, 20, 30, 0.95); border: 1px solid var(--red);
+    box-shadow: 0 0 50px rgba(224, 8, 0, 0.2); text-align: left;
+  }
+  .modal-header h3 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+  .modal-header p { color: #94a3b8; margin-bottom: 2rem; }
+  .admin-input {
+    width: 100%; padding: 12px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+    color: white; font-size: 1rem; margin-top: 0.5rem; margin-bottom: 2rem;
+  }
+  .modal-actions { display: flex; gap: 1rem; }
+  .modal-actions button { flex: 1; }
+
   .nebula-outer { display: flex; align-items: center; justify-content: center; gap: 2rem; max-width: 1200px; margin: 0 auto; }
   .nav-arrow { width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; backdrop-filter: blur(10px); }
   .nav-arrow:hover { background: rgba(224, 8, 0, 0.2); border-color: var(--red); transform: scale(1.1); }
@@ -271,6 +439,7 @@
     border-radius: 32px; border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 40px 80px rgba(0, 0, 0, 0.5);
     position: relative; overflow: hidden;
+    backface-visibility: hidden; transform-style: preserve-3d; will-change: transform;
   }
   .card-content-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 4rem; position: relative; z-index: 2; }
   .card-info-side { border-left: 1px solid rgba(255,255,255,0.08); padding-left: 4rem; display: flex; flex-direction: column; justify-content: center; }
@@ -321,8 +490,27 @@
   .trend-pill { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1); }
 
   .bundles-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; max-width: 1200px; margin: 0 auto; }
-  .bundle-card { padding: 2.5rem; border-radius: 28px; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1); position: relative; overflow: hidden; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
-  .bundle-card:hover { transform: translateY(-10px) scale(1.02); border-color: rgba(255, 255, 255, 0.2); }
+  .bundle-card { 
+    padding: 2.5rem; border-radius: 28px; 
+    background: rgba(255, 255, 255, 0.03); 
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08); 
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1); 
+    position: relative; overflow: hidden; 
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    
+    /* Anti-Blur Fixes */
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform-style: preserve-3d;
+    will-change: transform;
+    -webkit-font-smoothing: antialiased;
+  }
+  .bundle-card:hover { 
+    transform: translateY(-10px) scale(1.02); 
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+  }
 
   .bundle-visual { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem; position: relative; z-index: 2; }
   .icon-orb { width: 50px; height: 50px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1); }
@@ -336,6 +524,7 @@
   .quota-unit { color: #94a3b8; font-weight: 600; font-size: 0.9rem; }
 
   .btn-bundle-action { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.1); color: white; font-weight: 700; padding: 12px; border-radius: 12px; transition: all 0.3s; position: relative; z-index: 2; }
+  .bundle-card:hover { border-color: var(--red); }
   .bundle-card:hover .btn-bundle-action { background: var(--red); border-color: var(--red); box-shadow: 0 10px 20px rgba(224, 8, 0, 0.3); }
 
   .section-title { text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 4rem; color: white; letter-spacing: -0.05em; }

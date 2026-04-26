@@ -10,6 +10,18 @@
       "_internal.js"
     ]
   },
+  "_client.js": {
+    "file": "chunks/client.js",
+    "name": "client",
+    "imports": [
+      "_state.svelte.js",
+      "_url.js",
+      "_utils.js",
+      "_index.js",
+      "_root.js",
+      "_exports.js"
+    ]
+  },
   "_environment.js": {
     "file": "chunks/environment.js",
     "name": "environment"
@@ -94,12 +106,7 @@
     "isEntry": true,
     "imports": [
       "_renderer.js",
-      "_state.svelte.js",
-      "_url.js",
-      "_utils.js",
-      "_index.js",
-      "_root.js",
-      "_exports.js"
+      "_client.js"
     ]
   },
   "node_modules/@sveltejs/kit/src/runtime/server/index.js": {
@@ -262,10 +269,11 @@
     "src": "src/routes/packages/+page.svelte",
     "isEntry": true,
     "imports": [
-      "_renderer.js"
+      "_renderer.js",
+      "_client.js"
     ],
     "css": [
-      "_app/immutable/assets/_page.BKKJk3RF.css"
+      "_app/immutable/assets/_page.DqitFS99.css"
     ]
   },
   "src/routes/profile/+page.svelte": {
