@@ -24,6 +24,8 @@ public class AdminStatsServlet extends BaseServlet {
             formatted.put("customers", result.get("total_customers"));
             formatted.put("contracts", result.get("active_contracts"));
             formatted.put("cdrs", result.get("total_cdrs"));
+            formatted.put("revenue", result.get("total_revenue"));
+            formatted.put("pending_bills", result.get("pending_bills"));
 
             return formatted;
         });

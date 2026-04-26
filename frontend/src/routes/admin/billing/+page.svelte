@@ -6,6 +6,7 @@
   let loading = $state(true);
   let showAudit = $state(false);
   let processingBills = $state(false);
+  let selectedIds = $state(new Set());
 
   async function loadData() {
     loading = true;
@@ -41,6 +42,53 @@
     } finally {
       processingBills = false;
     }
+  }
+
+  async function payBill(billId) {
+    if (!confirm(`Mark Bill #${billId} as paid?`)) return;
+    try {
+      const res = await fetch(`/api/admin/bills/pay?billId=${billId}`, { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        selectedIds.delete(billId);
+        loadData();
+      } else {
+        alert("Payment update failed.");
+      }
+    } catch (e) {
+      alert("Network error.");
+    }
+  }
+
+  async function bulkPay() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Mark ${selectedIds.size} bills as paid?`)) return;
+    const ids = Array.from(selectedIds).join(',');
+    try {
+      const res = await fetch(`/api/admin/bills/pay-bulk?ids=${ids}`, { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        selectedIds.clear();
+        loadData();
+      } else {
+        alert("Bulk payment failed.");
+      }
+    } catch (e) {
+      alert("Network error.");
+    }
+  }
+
+  function toggleSelect(id) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    selectedIds = new Set(selectedIds); // Trigger reactivity
+  }
+
+  function toggleAll() {
+    if (selectedIds.size === bills.filter(b => b.status !== 'paid').length && selectedIds.size > 0) {
+      selectedIds.clear();
+    } else {
+      bills.forEach(b => { if (b.status !== 'paid') selectedIds.add(b.id) });
+    }
+    selectedIds = new Set(selectedIds); // Trigger reactivity
   }
 
   $effect(() => {
@@ -132,6 +180,11 @@
       {#if contractId}
         <button class="btn btn-secondary" onclick={() => { contractId = ''; loadData(); }}>Clear Filter</button>
       {/if}
+      {#if selectedIds.size > 0}
+        <button class="btn btn-primary animate-fade" onclick={bulkPay} style="background: #22C55E; margin-left: auto;">
+          Mark {selectedIds.size} Selected as Paid
+        </button>
+      {/if}
     </div>
   </div>
   
@@ -145,12 +198,24 @@
     <table>
       <thead>
         <tr>
-          <th>Bill ID</th><th>Customer</th><th>Period</th><th>Usage (V/D/S)</th><th>Total</th><th>Status</th>
+          <th style="width: 40px;">
+            <input type="checkbox" 
+                   checked={selectedIds.size === bills.filter(b => b.status !== 'paid').length && bills.length > 0} 
+                   onchange={toggleAll} />
+          </th>
+          <th>Bill ID</th><th>Customer</th><th>Period</th><th>Usage (V/D/S)</th><th>Total</th><th>Status</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {#each bills as b}
-        <tr>
+        <tr class:row-selected={selectedIds.has(b.id)}>
+          <td>
+            {#if b.status !== 'paid'}
+              <input type="checkbox" checked={selectedIds.has(b.id)} onchange={() => toggleSelect(b.id)} />
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            {/if}
+          </td>
           <td><span class="id-badge">#{b.id}</span></td>
           <td>
             <div class="customer-cell">
@@ -171,6 +236,13 @@
             <span class="badge status-{b.status || 'issued'}">
               {b.status || 'issued'}
             </span>
+          </td>
+          <td>
+            {#if b.status !== 'paid'}
+              <button class="btn btn-secondary btn-sm" onclick={() => payBill(b.id)}>
+                Mark Paid
+              </button>
+            {/if}
           </td>
         </tr>
         {/each}

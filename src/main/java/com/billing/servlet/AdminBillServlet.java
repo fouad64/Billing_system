@@ -45,6 +45,21 @@ public class AdminBillServlet extends BaseServlet {
                 DB.executeSelect("SELECT generate_all_bills(DATE_TRUNC('month', CURRENT_DATE)::DATE)");
                 return Map.of("success", true, "message", "Billing cycle generated successfully.");
             }
+            if ("pay".equals(pathParam)) {
+                String billId = req.getParameter("billId");
+                DB.executeUpdate("UPDATE bill SET is_paid = true, status = 'paid' WHERE id = ?", Integer.parseInt(billId));
+                return Map.of("success", true, "message", "Bill #" + billId + " marked as paid.");
+            }
+            if ("pay-bulk".equals(pathParam)) {
+                String ids = req.getParameter("ids");
+                if (ids != null && !ids.isEmpty()) {
+                    String[] idArray = ids.split(",");
+                    for (String id : idArray) {
+                        DB.executeUpdate("UPDATE bill SET is_paid = true, status = 'paid' WHERE id = ?", Integer.parseInt(id));
+                    }
+                }
+                return Map.of("success", true, "message", "Bulk payment completed.");
+            }
             throw new RuntimeException("Invalid action: " + pathParam);
         });
     }

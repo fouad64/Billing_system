@@ -53,12 +53,20 @@
   
   <div class="search-bar animate-fade">
     <div style="display:flex;gap:1rem">
-      <input class="input" style="width:250px" placeholder="Search by name or email..." bind:value={search} oninput={() => setTimeout(load, 300)} aria-label="Search customers" />
-      <button class="btn btn-primary" onclick={() => { showModal = true; error = ''; }}>+ Add New Customer</button>
+      <div class="relative group" style="position: relative;">
+        <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b;">
+           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input class="input" style="width:300px; padding-left: 2.5rem;" placeholder="Search directory..." bind:value={search} oninput={() => setTimeout(load, 300)} aria-label="Search customers" />
+      </div>
+      <button class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.5rem;" onclick={() => { showModal = true; error = ''; }}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        Add New Customer
+      </button>
     </div>
   </div>
 
-  <div class="table-wrapper card card-static animate-fade" style="margin-top: 0; border: 1px solid var(--border); border-radius: 20px; overflow: hidden;">
+  <div class="table-wrapper card card-static animate-fade" style="margin-top: 2rem; border: 1px solid var(--border); border-radius: 20px; overflow: hidden;">
     <table style="border: none;">
       <thead>
         <tr><th>ID</th><th>MSISDN</th><th>Name</th><th>Email</th><th>Address</th><th>Birthdate</th></tr>
@@ -147,10 +155,11 @@
     background: transparent;
     margin-top: 0;
   }
-  .id-badge { background: rgba(255, 255, 255, 0.05); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; color: #64748b; }
-  .phone-num { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #3B82F6 !important; }
-  .customer-name { font-weight: 600; color: #ffffff !important; }
-  .meta-info { color: #94a3b8 !important; font-size: 0.9rem; }
+
+  
+  .id-badge { background: rgba(255, 255, 255, 0.05); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; color: #94a3b8; }
+  
+  .card-static:hover { background: var(--glass-bg) !important; }
   
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:200; backdrop-filter:blur(8px); }
   .modal { width:100%; max-width:480px; padding:2.5rem; transform:none !important; }
