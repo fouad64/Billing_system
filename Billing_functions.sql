@@ -1,4 +1,3 @@
-
 -- ============================================================
 -- FUNCTIONS (for billing calculations, etc.)
 -- ============================================================
@@ -576,7 +575,322 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql;
 
+-- ------------------------------------------------------------
+-- GET ALL CONTRACTS
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_all_contracts()
+    RETURNS TABLE (
+                      id               INTEGER,
+                      msisdn           VARCHAR(20),
+                      status           contract_status,
+                      available_credit NUMERIC(12,2),
+                      customer_name    VARCHAR(255),
+                      rateplan_name    VARCHAR(255)
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    c.id,
+    c.msisdn,
+    c.status,
+    c.available_credit,
+    u.name  AS customer_name,
+    r.name  AS rateplan_name
+FROM contract c
+         JOIN user_account u ON c.user_account_id = u.id
+         LEFT JOIN rateplan r ON c.rateplan_id = r.id
+ORDER BY c.id DESC;
+END;
+$$ LANGUAGE plpgsql;
 
+
+-- ------------------------------------------------------------
+-- GET CONTRACT BY ID (detail view)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_contract_by_id(p_id INTEGER)
+    RETURNS TABLE (
+                      id               INTEGER,
+                      user_account_id  INTEGER,
+                      rateplan_id      INTEGER,
+                      msisdn           VARCHAR(20),
+                      status           contract_status,
+                      credit_limit     NUMERIC(12,2),
+                      available_credit NUMERIC(12,2),
+                      customer_name    VARCHAR(255),
+                      rateplan_name    VARCHAR(255)
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    c.id,
+    c.user_account_id,
+    c.rateplan_id,
+    c.msisdn,
+    c.status,
+    c.credit_limit,
+    c.available_credit,
+    u.name AS customer_name,
+    r.name AS rateplan_name
+FROM contract c
+         JOIN user_account u ON c.user_account_id = u.id
+         LEFT JOIN rateplan r ON c.rateplan_id = r.id
+WHERE c.id = p_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ------------------------------------------------------------
+-- GET ALL CUSTOMERS
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_all_customers()
+    RETURNS TABLE (
+                      id        INTEGER,
+                      username    VARCHAR(255),
+                      name      VARCHAR(255),
+                      email     VARCHAR(255),
+                      role      user_role,
+                      address   TEXT,
+                      birthdate DATE
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    ua.id,
+    ua.username,
+    ua.name,
+    ua.email,
+    ua.role,
+    ua.address,
+    ua.birthdate
+FROM user_account ua
+WHERE ua.role = 'customer'
+ORDER BY ua.id DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+-- ------------------------------------------------------------
+-- GET USER DATA
+-- ------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION get_user_data(p_user_account_id INTEGER)
+    RETURNS TABLE (
+                      username VARCHAR(255),
+                      role VARCHAR(20),
+                      name VARCHAR(255),
+                      email VARCHAR(255),
+                      address TEXT,
+                      birthdate DATE
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    ua.username,
+    ua.role,
+    ua.name,
+    ua.email,
+    ua.address,
+    ua.birthdate
+FROM user_account ua
+WHERE ua.id = p_user_account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ------------------------------------------------------------
+-- AUTHENTICATE LOGIN
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION login(p_username     VARCHAR(255), p_password VARCHAR(30))
+    RETURNS TABLE (
+                      user_account_id INTEGER,
+                      username VARCHAR(255),
+                      name VARCHAR(255),
+                      email VARCHAR(255),
+                      role user_role
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    ua.id,
+    ua.username,
+    ua.name,
+    ua.email,
+    ua.role
+FROM user_account ua
+WHERE
+    ua.password = p_password
+  AND ua.username = p_username;
+END;
+    $$ LANGUAGE plpgsql;
+-- ------------------------------------------------------------
+-- GET CDRs (paginated)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_cdrs(p_limit INTEGER DEFAULT 50, p_offset INTEGER DEFAULT 0)
+    RETURNS TABLE (
+                      id          INTEGER,
+                      msisdn      VARCHAR(20),
+                      destination VARCHAR(20),
+                      duration    INTEGER,
+                      "timestamp"   TIMESTAMP,
+                      type        INTEGER,
+                      rated       BOOLEAN
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    c.id,
+    c.dial_a   AS msisdn,
+    c.dial_b   AS destination,
+    c.duration,
+    c.start_time AS timestamp,
+            c.service_id AS type,
+            c.rated_flag AS rated
+FROM cdr c
+ORDER BY c.start_time DESC
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- GET USER CONTRACTS
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_user_contracts(p_user_id INTEGER)
+    RETURNS TABLE (
+                      id               INTEGER,
+                      msisdn           VARCHAR(20),
+                      status           contract_status,
+                      available_credit NUMERIC(12,2),
+                      credit_limit     NUMERIC(12,2),
+                      rateplan_name    VARCHAR(255)
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    c.id,
+    c.msisdn,
+    c.status,
+    c.available_credit,
+    c.credit_limit,
+    r.name AS rateplan_name
+FROM contract c
+         LEFT JOIN rateplan r ON c.rateplan_id = r.id
+WHERE c.user_account_id = p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- GET USER INVOICES (bills)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_user_invoices(p_user_id INTEGER)
+    RETURNS TABLE (
+                      id                   INTEGER,
+                      contract_id          INTEGER,
+                      billing_period_start DATE,
+                      billing_period_end   DATE,
+                      billing_date         DATE,
+                      recurring_fees       NUMERIC(12,2),
+                      one_time_fees        NUMERIC(12,2),
+                      voice_usage          INTEGER,
+                      data_usage           INTEGER,
+                      sms_usage            INTEGER,
+                      ror_charge           NUMERIC(12,2),
+                      taxes                NUMERIC(12,2),
+                      total_amount         NUMERIC(12,2),
+                      status               bill_status,
+                      is_paid              BOOLEAN,
+                      pdf_path             TEXT
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    b.id,
+    b.contract_id,
+    b.billing_period_start,
+    b.billing_period_end,
+    b.billing_date,
+    b.recurring_fees,
+    b.one_time_fees,
+    b.voice_usage,
+    b.data_usage,
+    b.sms_usage,
+    b.ror_charge,
+    b.taxes,
+    b.total_amount,
+    b.status,
+    b.is_paid,
+    i.pdf_path
+FROM bill b
+         JOIN contract c ON b.contract_id = c.id
+         LEFT JOIN invoice i on b.id = i.bill_id
+WHERE c.user_account_id = p_user_id
+ORDER BY b.billing_date DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ------------------------------------------------------------
+-- CREATE SERVICE PACKAGE
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION create_service_package(
+    p_name        VARCHAR(255),
+    p_type        service_type,
+    p_amount      NUMERIC(12,4),
+    p_priority    INTEGER,
+    p_price       NUMERIC(10,2),
+    p_description TEXT,
+    p_is_roaming  BOOLEAN DEFAULT FALSE
+)
+    RETURNS TABLE (
+                      id          INTEGER,
+                      name        VARCHAR(255),
+                      type        service_type,
+                      amount      NUMERIC(12,4),
+                      priority    INTEGER,
+                      price       NUMERIC(10,2),
+                      description TEXT,
+                      is_roaming  BOOLEAN
+                  ) AS $$
+BEGIN
+RETURN QUERY
+    INSERT INTO service_package (name, type, amount, priority, price, description, is_roaming)
+            VALUES (p_name, p_type, p_amount, p_priority, p_price, p_description, p_is_roaming)
+            RETURNING
+                service_package.id,
+                service_package.name,
+                service_package.type,
+                service_package.amount,
+                service_package.priority,
+                service_package.price,
+                service_package.description,
+                service_package.is_roaming;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ------------------------------------------------------------
+-- GET RATEPLANS BY NAME LIST
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_all_rateplans()
+    RETURNS TABLE (
+                      id        INTEGER,
+                      name      VARCHAR(255),
+                      price     NUMERIC(10,2),
+                      ror_voice NUMERIC(10,2),
+                      ror_data  NUMERIC(10,2),
+                      ror_sms   NUMERIC(10,2)
+                  ) AS $$
+BEGIN
+RETURN QUERY
+SELECT
+    r.id,
+    r.name,
+    r.price,
+    r.ror_voice,
+    r.ror_data,
+    r.ror_sms
+FROM rateplan "r"
+ORDER BY r.price ASC;
+END;
+$$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 -- Retrieve BILL DATA
 -- In a real system, you'd likely have a separate service that queries the bill data
@@ -602,21 +916,21 @@ RETURNS TABLE (
 BEGIN
 RETURN QUERY
 SELECT
-    contract_id,
-    billing_period_start,
-    billing_period_end,
-    billing_date,
-    recurring_fees,
-    one_time_fees,
-    voice_usage,
-    data_usage,
-    sms_usage,
-    ROR_charge,
-    taxes,
-    total_amount,
-    status,
-    is_paid
-FROM bill
+    b.contract_id,
+    b.billing_period_start,
+    b.billing_period_end,
+    b.billing_date,
+    b.recurring_fees,
+    b.one_time_fees,
+    b.voice_usage,
+    b.data_usage,
+    b.sms_usage,
+    b.ROR_charge,
+    b.taxes,
+    b.total_amount,
+    b.status,
+    b.is_paid
+FROM bill b
 WHERE id = p_bill_id;
 END;
 $$ LANGUAGE plpgsql;
@@ -717,6 +1031,7 @@ ORDER BY billing_period_start DESC;
 END;
 $$ LANGUAGE plpgsql;
 
+
 -- ------------------------------------------------------------
 -- CREATE CUSTOMER
 -- ------------------------------------------------------------
@@ -750,7 +1065,6 @@ EXCEPTION
         RAISE EXCEPTION 'create_customer failed: %', SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
-
 
 -- ------------------------------------------------------------
 -- CREATE ADMIN
@@ -988,7 +1302,7 @@ WHERE contract_id = p_contract_id
   AND bill_id IS NULL;
 
 ELSE
-        -- No proration: close old consumption silently
+-- No proration: close old consumption silently
 UPDATE contract_consumption
 SET is_billed = TRUE
 WHERE contract_id   = p_contract_id
@@ -998,9 +1312,9 @@ WHERE contract_id   = p_contract_id
   AND is_billed     = FALSE;
 END IF;
 
-    -- --------------------------------------------------------
-    -- SWITCH TO NEW RATEPLAN
-    -- --------------------------------------------------------
+-- --------------------------------------------------------
+-- SWITCH TO NEW RATEPLAN
+-- --------------------------------------------------------
 UPDATE contract
 SET rateplan_id = p_new_rateplan_id
 WHERE id = p_contract_id;
