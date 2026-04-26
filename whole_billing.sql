@@ -192,6 +192,21 @@ CREATE TABLE cdr (
                      rated_flag       BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+-- ------------------------------------------------------------
+-- CUSTOMER ADD-ONS
+-- Tracks extra service packages purchased by a customer
+-- on top of their existing contract/rateplan
+-- ------------------------------------------------------------
+CREATE TABLE contract_addon (
+                                id                 SERIAL PRIMARY KEY,
+                                contract_id        INTEGER NOT NULL REFERENCES contract(id),
+                                service_package_id INTEGER NOT NULL REFERENCES service_package(id),
+                                purchased_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+                                expiry_date        DATE NOT NULL,
+                                is_active          BOOLEAN NOT NULL DEFAULT TRUE,
+                                price_paid         NUMERIC(12,2) NOT NULL DEFAULT 0
+);
+
 
 -- ============================================================
 -- INDEXES (performance basics)
@@ -204,7 +219,8 @@ CREATE INDEX idx_contract_user_account  ON contract(user_account_id);
 CREATE INDEX idx_bill_contract      ON bill(contract_id);
 CREATE INDEX idx_bill_billing_date  ON bill(billing_date);
 CREATE INDEX idx_invoice_bill       ON invoice(bill_id);
-
+CREATE INDEX idx_addon_contract ON contract_addon(contract_id);
+CREATE INDEX idx_addon_active   ON contract_addon(contract_id, is_active);
 -- ============================================================
 -- FUNCTIONS (for billing calculations, etc.)
 -- ============================================================
@@ -642,30 +658,33 @@ $$ LANGUAGE plpgsql;
 -- at the end of each billing period.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION generate_all_bills(p_period_start DATE)
-RETURNS VOID AS $$
+    RETURNS VOID AS $$
 DECLARE
-v_contract RECORD;
+    v_contract RECORD;
     v_success  INTEGER := 0;
     v_failed   INTEGER := 0;
 BEGIN
-FOR v_contract IN
-SELECT id FROM contract WHERE status = 'active'
-    LOOP
-BEGIN
-            PERFORM generate_bill(v_contract.id, p_period_start);
-            v_success := v_success + 1;
-EXCEPTION
-            WHEN OTHERS THEN
-                -- Log failure but continue processing remaining contracts
-                RAISE WARNING 'generate_bill failed for contract %: %', v_contract.id, SQLERRM;
-                v_failed := v_failed + 1;
-END;
-END LOOP;
+    -- Expire any add-ons from last period first
+    PERFORM expire_addons();
 
-    RAISE NOTICE 'generate_all_bills complete: % succeeded, % failed', v_success, v_failed;
+    FOR v_contract IN
+        SELECT id FROM contract WHERE status = 'active'
+        LOOP
+            BEGIN
+                PERFORM generate_bill(v_contract.id, p_period_start);
+                v_success := v_success + 1;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    RAISE WARNING 'generate_bill failed for contract %: %',
+                        v_contract.id, SQLERRM;
+                    v_failed := v_failed + 1;
+            END;
+        END LOOP;
+
+    RAISE NOTICE 'generate_all_bills complete: % succeeded, % failed',
+        v_success, v_failed;
 END;
 $$ LANGUAGE plpgsql;
-
 -- ------------------------------------------------------------
 -- GET BILLS THAT ARE MISSING (contracts with no bill this period)
 -- ------------------------------------------------------------
@@ -1815,6 +1834,179 @@ BEGIN
             (SELECT COUNT(*) FROM contract),
             (SELECT COUNT(*) FROM contract      WHERE status = 'active'),
             (SELECT COUNT(*) FROM cdr);
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- PURCHASE ADD-ON
+-- Customer buys an extra service package
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION purchase_addon(
+    p_contract_id        INTEGER,
+    p_service_package_id INTEGER
+)
+    RETURNS INTEGER AS $$
+DECLARE
+    v_addon_id     INTEGER;
+    v_pkg_price    NUMERIC(12,2);
+    v_pkg_amount   NUMERIC(12,4);
+    v_pkg_type     service_type;
+    v_expiry       DATE;
+    v_period_start DATE;
+    v_period_end   DATE;
+BEGIN
+    -- Validate contract exists and is active
+    IF NOT EXISTS (
+        SELECT 1 FROM contract WHERE id = p_contract_id AND status = 'active'
+    ) THEN
+        RAISE EXCEPTION 'Contract % is not active', p_contract_id;
+    END IF;
+
+    -- Validate service package exists
+    SELECT price, amount, type
+    INTO v_pkg_price, v_pkg_amount, v_pkg_type
+    FROM service_package
+    WHERE id = p_service_package_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Service package % not found', p_service_package_id;
+    END IF;
+
+    -- Check not already active
+    IF EXISTS (
+        SELECT 1 FROM contract_addon
+        WHERE contract_id        = p_contract_id
+          AND service_package_id = p_service_package_id
+          AND is_active          = TRUE
+    ) THEN
+        RAISE EXCEPTION 'Add-on already active for this contract';
+    END IF;
+
+    -- Check customer has enough credit
+    IF NOT EXISTS (
+        SELECT 1 FROM contract
+        WHERE id = p_contract_id
+          AND available_credit >= COALESCE(v_pkg_price, 0)
+    ) THEN
+        RAISE EXCEPTION 'Insufficient credit to purchase add-on';
+    END IF;
+
+    -- Expiry = end of current billing month
+    v_expiry := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day')::DATE;
+
+    -- Insert addon record
+    INSERT INTO contract_addon (
+        contract_id, service_package_id,
+        purchased_date, expiry_date,
+        is_active, price_paid
+    ) VALUES (
+                 p_contract_id, p_service_package_id,
+                 CURRENT_DATE, v_expiry,
+                 TRUE, COALESCE(v_pkg_price, 0)
+             ) RETURNING id INTO v_addon_id;
+
+    -- Deduct price from available credit
+    UPDATE contract
+    SET available_credit = available_credit - COALESCE(v_pkg_price, 0)
+    WHERE id = p_contract_id;
+
+    -- Add consumption row so rate_cdr can deduct from it
+    v_period_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+    v_period_end   := v_expiry;
+
+    INSERT INTO contract_consumption (
+        contract_id, service_package_id, rateplan_id,
+        starting_date, ending_date, consumed, is_billed
+    )
+    SELECT
+        p_contract_id,
+        p_service_package_id,
+        c.rateplan_id,
+        v_period_start,
+        v_period_end,
+        0,
+        FALSE
+    FROM contract c
+    WHERE c.id = p_contract_id
+    ON CONFLICT DO NOTHING;
+
+    RETURN v_addon_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'purchase_addon failed: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- CANCEL ADD-ON
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION cancel_addon(p_addon_id INTEGER)
+    RETURNS VOID AS $$
+BEGIN
+    UPDATE contract_addon
+    SET is_active = FALSE
+    WHERE id = p_addon_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Add-on % not found', p_addon_id;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'cancel_addon failed: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- GET ACTIVE ADD-ONS FOR A CONTRACT
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_contract_addons(p_contract_id INTEGER)
+    RETURNS TABLE (
+                      id                 INTEGER,
+                      service_package_id INTEGER,
+                      package_name       VARCHAR(255),
+                      type               service_type,
+                      amount             NUMERIC(12,4),
+                      purchased_date     DATE,
+                      expiry_date        DATE,
+                      price_paid         NUMERIC(12,2),
+                      is_active          BOOLEAN
+                  ) AS $$
+BEGIN
+    RETURN QUERY
+        SELECT
+            ca.id,
+            ca.service_package_id,
+            sp.name        AS package_name,
+            sp.type,
+            sp.amount,
+            ca.purchased_date,
+            ca.expiry_date,
+            ca.price_paid,
+            ca.is_active
+        FROM contract_addon ca
+                 JOIN service_package sp ON sp.id = ca.service_package_id
+        WHERE ca.contract_id = p_contract_id
+        ORDER BY ca.purchased_date DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ------------------------------------------------------------
+-- AUTO-EXPIRE ADD-ONS AT END OF BILLING PERIOD
+-- Call this at the start of each new billing cycle
+-- or add it inside generate_all_bills
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION expire_addons()
+    RETURNS VOID AS $$
+BEGIN
+    UPDATE contract_addon
+    SET is_active = FALSE
+    WHERE expiry_date < CURRENT_DATE
+      AND is_active   = TRUE;
 END;
 $$ LANGUAGE plpgsql;
 -- =========================================================

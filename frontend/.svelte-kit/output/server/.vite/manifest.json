@@ -206,6 +206,23 @@
       "_app/immutable/assets/_page.D3KUScTN.css"
     ]
   },
+  "src/routes/admin/contracts/[id]/+page.svelte": {
+    "file": "entries/pages/admin/contracts/_id_/_page.svelte.js",
+    "name": "entries/pages/admin/contracts/_id_/_page.svelte",
+    "src": "src/routes/admin/contracts/[id]/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_renderer.js",
+      "_url.js",
+      "_utils.js",
+      "_root.js",
+      "_exports.js",
+      "_state.svelte.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.Hwx73b1j.css"
+    ]
+  },
   "src/routes/admin/customers/+page.svelte": {
     "file": "entries/pages/admin/customers/_page.svelte.js",
     "name": "entries/pages/admin/customers/_page.svelte",
