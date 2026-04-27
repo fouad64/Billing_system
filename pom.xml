@@ -15,44 +15,49 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jakarta.servlet.version>6.1.0</jakarta.servlet.version>
     </properties>
+ 
+<dependencies>
 
-    <dependencies>
-        <!-- Tomcat 11 Servlet API -->
-        <dependency>
-            <groupId>jakarta.servlet</groupId>
-            <artifactId>jakarta.servlet-api</artifactId>
-            <version>${jakarta.servlet.version}</version>
-            <scope>provided</scope>
-        </dependency>
+    <!-- Servlet API (Tomcat 10/11 - Jakarta) -->
+    <dependency>
+        <groupId>jakarta.servlet</groupId>
+        <artifactId>jakarta.servlet-api</artifactId>
+        <version>6.1.0</version>
+        <scope>provided</scope>
+    </dependency>
 
-        <!-- PostgreSQL Driver -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>42.7.5</version>
-        </dependency>
+    <!-- PostgreSQL Driver -->
+    <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>42.7.3</version>
+    </dependency>
 
-        <!-- JSON Handling -->
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.12.1</version>
-        </dependency>
+    <!-- Gson -->
+    <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>2.11.0</version>
+    </dependency>
 
-        <!-- Invoicing: JasperReports -->
-        <dependency>
-            <groupId>net.sf.jasperreports</groupId>
-            <artifactId>jasperreports</artifactId>
-            <version>6.21.0</version>
-        </dependency>
+    <!-- HikariCP Connection Pool -->
+    <dependency>
+        <groupId>com.zaxxer</groupId>
+        <artifactId>HikariCP</artifactId>
+        <version>5.1.0</version>
+    </dependency>
 
-        <!-- HikariCP Connection Pool -->
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>6.2.1</version>
-        </dependency>
-    </dependencies>
+    <!-- JasperReports Core -->
+    <dependency>
+        <groupId>net.sf.jasperreports</groupId>
+        <artifactId>jasperreports</artifactId>
+        <version>7.0.6</version>
+    </dependency>
+
+  
+
+</dependencies>
+  
 
     <build>
         <finalName>ROOT</finalName>
@@ -74,7 +79,9 @@
                 <executions>
                     <execution>
                         <id>install-node-and-npm</id>
-                        <goals><goal>install-node-and-npm</goal></goals>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
                         <phase>package</phase>
                         <configuration>
                             <nodeVersion>v20.11.0</nodeVersion>
@@ -82,7 +89,9 @@
                     </execution>
                     <execution>
                         <id>npm-install</id>
-                        <goals><goal>npm</goal></goals>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
                         <phase>package</phase>
                         <configuration>
                             <workingDirectory>frontend</workingDirectory>
@@ -91,7 +100,9 @@
                     </execution>
                     <execution>
                         <id>npm-build</id>
-                        <goals><goal>npm</goal></goals>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
                         <phase>package</phase>
                         <configuration>
                             <workingDirectory>frontend</workingDirectory>
