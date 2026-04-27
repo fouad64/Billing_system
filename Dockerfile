@@ -1,12 +1,30 @@
-FROM tomcat:10.1-jdk17
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
-LABEL authors="FMRZ"
+WORKDIR /app
 
-# Remove default webapps
+# Install Node.js
+RUN apt-get update && apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    node --version && npm --version
+
+# Copy pom.xml for dependency caching
+COPY pom.xml .
+RUN mvn dependency:go-offline -B -q
+
+# Build frontend first
+COPY frontend/ ./frontend/
+WORKDIR /app/frontend
+RUN npm install && npm run build
+
+# Build backend
+WORKDIR /app
+COPY src ./src
+RUN mvn -DskipTests clean package -B
+
+# ── Runtime ──
+FROM tomcat:10.1-jdk21
 RUN rm -rf /usr/local/tomcat/webapps/*
-
-# Copy your built WAR file
-COPY target/*.war /usr/local/tomcat/webapps/ROOT.war
-
+COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
 EXPOSE 8080
 CMD ["catalina.sh", "run"]
