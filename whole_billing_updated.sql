@@ -599,9 +599,9 @@ WHERE contract_id = p_contract_id
   AND rateplan_id = v_rateplan_id
   AND bill_id IS NULL;  -- only consider unbilled ROR
 
--- For simplicity, let's say taxes are 15% of (recurring + ROR)
+-- For simplicity, let's say taxes are 10% of (recurring + ROR)
 v_one_time_fees := 0.69;  -- could include one-time charges here
-v_taxes := 0.15 * (v_recurring_fees + v_ROR_charge);
+v_taxes := 0.10 * (v_recurring_fees + v_ROR_charge);
 v_total_amount := v_recurring_fees + v_one_time_fees + v_ROR_charge + v_taxes;
 
     -- Insert bill
@@ -1519,7 +1519,7 @@ END LOOP;
             (v_data_overage  * COALESCE(v_old_ror_data,  0)) +
             (v_sms_overage   * COALESCE(v_old_ror_sms,   0));
 
-        v_taxes := ROUND(0.15 * (v_prorated_recurring + v_prorated_charge), 2);
+        v_taxes := ROUND(0.10 * (v_prorated_recurring + v_prorated_charge), 2);
         v_total := v_prorated_recurring + v_prorated_charge + v_taxes;
 
         -- Insert prorated bill

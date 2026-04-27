@@ -81,6 +81,8 @@ public class CustomerProfileServlet extends BaseServlet {
                     
                     Map<String, Object> params = new HashMap<>();
                     params.put("BILL_ID", billId);
+                    params.put("LOGO_PATH", getClass().getResource("/logo.svg").toExternalForm());
+                    params.put(JRParameter.REPORT_CLASS_LOADER, getClass().getClassLoader());
 
                     JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
                     JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, params, conn);
@@ -90,9 +92,17 @@ public class CustomerProfileServlet extends BaseServlet {
             else {
                 sendError(res, 404, "Unknown customer endpoint: " + path);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace(); // Print to IntelliJ console for you to see
-            sendError(res, 500, "Jasper Error: " + e.getMessage() + " (Check console for full trace)");
+            // Clear response and send JSON error
+            try {
+                if (!res.isCommitted()) {
+                    res.reset();
+                    sendError(res, 500, "Jasper Error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                }
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
         }
     }
 }
