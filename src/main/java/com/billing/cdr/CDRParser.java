@@ -95,6 +95,10 @@ public class CDRParser {
 
                     String dialA = p[0].trim();
                     String dialB = p[1].trim();
+
+                    // Normalize MSISDNs (Strip leading '00' to match database format)
+                    if (dialA.startsWith("00")) dialA = dialA.substring(2);
+                    if (dialB.startsWith("00")) dialB = dialB.substring(2);
                     int serviceId = Integer.parseInt(p[2].trim());
                     int usage = Integer.parseInt(p[3].trim());
                     String timeStr = p[4].trim(); // HH:MM:SS
