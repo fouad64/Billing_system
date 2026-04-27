@@ -22,6 +22,7 @@ COPY src ./src
 RUN mvn -DskipTests clean package -B
 
 # ── Runtime ──
+#just some text for the branch merge test
 FROM tomcat:10.1-jdk21
 RUN rm -rf /usr/local/tomcat/webapps/*
 COPY --from=build /app/target/*.war /usr/local/tomcat/webapps/ROOT.war
