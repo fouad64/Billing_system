@@ -27,9 +27,18 @@ public class DB {
 
             HikariConfig config = new HikariConfig();
             config.setDriverClassName("org.postgresql.Driver");
-            config.setJdbcUrl(props.getProperty("db.url"));
-            config.setUsername(props.getProperty("db.user"));
-            config.setPassword(props.getProperty("db.password"));
+            // BEST PRACTICE: Cloud-First Configuration
+            // We prioritize Environment Variables (DB_URL, DB_USER, DB_PASSWORD).
+            // If they are missing, we fall back to db.properties (Local Dev mode).
+            // This allows the same JAR to run locally and in secure Podman containers.
+            String url = System.getenv("DB_URL");
+            config.setJdbcUrl(url != null ? url : props.getProperty("db.url"));
+
+            String user = System.getenv("DB_USER");
+            config.setUsername(user != null ? user : props.getProperty("db.user"));
+
+            String pass = System.getenv("DB_PASSWORD");
+            config.setPassword(pass != null ? pass : props.getProperty("db.password"));
             
             // Pool Configuration
             config.setMaximumPoolSize(10);
@@ -60,6 +69,13 @@ public class DB {
     }
 
     public static String getProperty(String key) {
+        // Support for Environment Overrides
+        if (key.equals("cdr.input.path") && System.getenv("CDR_INPUT_PATH") != null) {
+            return System.getenv("CDR_INPUT_PATH");
+        }
+        if (key.equals("cdr.processed.path") && System.getenv("CDR_PROCESSED_PATH") != null) {
+            return System.getenv("CDR_PROCESSED_PATH");
+        }
         return props.getProperty(key);
     }
 

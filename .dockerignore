@@ -1,0 +1,22 @@
+# Build Outputs
+target/
+node_modules/
+frontend/node_modules/
+src/main/webapp/_app/
+
+# Data & Secrets
+processed/
+*.sql
+.m2/
+
+# IDE & OS Junk
+.git/
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Wrapper files
+.mvn/
+mvnw
+mvnw.cmd

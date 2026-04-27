@@ -16,6 +16,12 @@ build/
 package-lock.json
 npm-debug.log*
 
+# Generated Assets
+src/main/webapp/_app/
+src/main/webapp/index.html
+*.jar
+!Telecom-Billing-Engine.jar # Keep if you want to track the specific version, but usually ignored
+
 # Database / Secrets
 src/main/resources/db.properties
 db.properties

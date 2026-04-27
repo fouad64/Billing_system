@@ -109,20 +109,32 @@ public class AppFilter implements Filter {
         }
     }
 
+    /**
+     * Finds the latest CSS asset dynamically.
+     * 
+     * FIX: We use getResourcePaths() instead of getRealPath(). 
+     * Inside a JAR, getRealPath() returns null, which would break the CSS injection.
+     */
     private synchronized String getCssTag(ServletContext context) {
         String assetPath = context.getRealPath("/_app/immutable/assets/");
-        if (assetPath == null) return "";
+        long currentDiskTime = 0;
         
-        File assetDir = new File(assetPath);
-        long currentDiskTime = assetDir.lastModified();
+        if (assetPath != null) {
+            // Check filesystem if available (IDE mode)
+            File assetDir = new File(assetPath);
+            currentDiskTime = assetDir.lastModified();
+        }
 
-        // Smart Sync: Only re-scan if the disk has actually changed
-        if (cachedCssTag != null && lastBuildTime >= currentDiskTime) {
+        // Use cache if assets haven't changed (Standard Performance Optimization)
+        if (cachedCssTag != null && (assetPath == null || lastBuildTime >= currentDiskTime)) {
             return cachedCssTag;
         }
-        // If we reach here, we need a fresh scan
+        
+        // SCANNING: Search for the CSS file inside the webapp (Works in both IDE and JAR)
         java.util.Set<String> assets = context.getResourcePaths("/_app/immutable/assets/");
         if (assets == null || assets.isEmpty()) return "";
+
+        // ... rest of the method
 
         Optional<String> cssFile = assets.stream()
                 .map(p -> p.substring(p.lastIndexOf("/") + 1))

@@ -14,7 +14,9 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jakarta.servlet.version>6.1.0</jakarta.servlet.version>
-        <tomcat.version>11.0.0</tomcat.version>
+        <tomcat.version>11.0.21</tomcat.version>
+        <jackson.version>2.18.6</jackson.version>
+        <jasper.version>7.0.4</jasper.version>
     </properties>
 
     <dependencies>
@@ -28,7 +30,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.5</version>
+            <version>42.7.7</version>
         </dependency>
 
         <!-- JSON Handling -->
@@ -41,22 +43,22 @@
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports-pdf</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports-functions</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports-jdt</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>jakarta.xml.bind</groupId>
@@ -71,7 +73,7 @@
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports-fonts</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.xmlgraphics</groupId>
@@ -118,10 +120,31 @@
             <artifactId>HikariCP</artifactId>
             <version>6.2.1</version>
         </dependency>
+        <!-- Security Patch: Explicitly upgrade vulnerable transitive dependencies -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.18.0</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-beanutils</groupId>
+            <artifactId>commons-beanutils</artifactId>
+            <version>1.11.0</version>
+        </dependency>
     </dependencies>
 
     <build>
-        <finalName>ROOT</finalName>
+        <finalName>Telecom-Billing-Engine</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -203,10 +226,29 @@
                         <goals><goal>shade</goal></goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- 1. SECURITY: Exclude signatures from dependency JARs. 
+                                             If kept, the JVM will reject the merged JAR as 'corrupt' or 'unsigned'. -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- 2. CLEANLINESS: Exclude module-info.class. These are 
+                                             unnecessary in a shaded Fat JAR and cause 'strong encapsulation' warnings. -->
+                                        <exclude>module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <transformers>
+                                <!-- 3. ENTRY POINT: Defines the main class for 'java -jar' execution. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.billing.Main</mainClass>
                                 </transformer>
+                                <!-- 4. SPI (Service Provider Interface): Correctly merges files in META-INF/services.
+                                     This is CRITICAL for JDBC drivers and JasperReports to load their plugins. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                         </configuration>
                     </execution>
