@@ -44,13 +44,10 @@ declare module '$env/static/private' {
 	export const HYPRLAND_CMD: string;
 	export const npm_config_cache: string;
 	export const PYTHONUNBUFFERED: string;
-	export const MAVEN_PROJECTBASEDIR: string;
 	export const XDG_BACKEND: string;
 	export const TERMINAL_EMULATOR: string;
-	export const MAVEN_CMD_LINE_ARGS: string;
 	export const NODE: string;
 	export const LC_ADDRESS: string;
-	export const JAVA_HOME: string;
 	export const LC_NAME: string;
 	export const SSH_AUTH_SOCK: string;
 	export const TERM_SESSION_ID: string;
@@ -118,7 +115,6 @@ declare module '$env/static/private' {
 	export const npm_node_execpath: string;
 	export const GIO_LAUNCHED_DESKTOP_FILE: string;
 	export const LC_NUMERIC: string;
-	export const OLDPWD: string;
 	export const HYPRCURSOR_SIZE: string;
 	export const _: string;
 	export const NODE_ENV: string;
@@ -214,13 +210,10 @@ declare module '$env/dynamic/private' {
 		HYPRLAND_CMD: string;
 		npm_config_cache: string;
 		PYTHONUNBUFFERED: string;
-		MAVEN_PROJECTBASEDIR: string;
 		XDG_BACKEND: string;
 		TERMINAL_EMULATOR: string;
-		MAVEN_CMD_LINE_ARGS: string;
 		NODE: string;
 		LC_ADDRESS: string;
-		JAVA_HOME: string;
 		LC_NAME: string;
 		SSH_AUTH_SOCK: string;
 		TERM_SESSION_ID: string;
@@ -288,7 +281,6 @@ declare module '$env/dynamic/private' {
 		npm_node_execpath: string;
 		GIO_LAUNCHED_DESKTOP_FILE: string;
 		LC_NUMERIC: string;
-		OLDPWD: string;
 		HYPRCURSOR_SIZE: string;
 		_: string;
 		NODE_ENV: string;

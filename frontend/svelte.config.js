@@ -1,15 +1,16 @@
 import adapter from '@sveltejs/adapter-static';
 
+const isProd = process.env.VERCEL === '1';
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
-		// adapter-static will generate a pure HTML/JS build
 		adapter: adapter({
-			pages: '../src/main/webapp',
-			assets: '../src/main/webapp',
-			fallback: 'index.html', // Enable SPA mode
+			pages:       isProd ? 'build' : '../src/main/webapp',
+			assets:      isProd ? 'build' : '../src/main/webapp',
+			fallback:    'index.html',
 			precompress: false,
-			strict: true
+			strict:      true
 		}),
 		paths: {
 			base: ""
