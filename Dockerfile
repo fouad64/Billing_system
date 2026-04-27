@@ -1,5 +1,4 @@
 FROM maven:3.9.6-eclipse-temurin-21 AS build
-
 WORKDIR /app
 
 # Install Node.js
@@ -12,7 +11,7 @@ RUN apt-get update && apt-get install -y curl && \
 COPY pom.xml .
 RUN mvn dependency:go-offline -B -q
 
-# Build frontend first
+# Build frontend
 COPY frontend/ ./frontend/
 WORKDIR /app/frontend
 RUN npm install && npm run build
