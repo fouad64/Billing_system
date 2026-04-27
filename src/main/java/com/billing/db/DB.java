@@ -21,31 +21,36 @@ public class DB {
     private static final String USER = System.getenv("DB_USER");
     private static final String PASS = System.getenv("DB_PASS");
     static {
-        try (InputStream input = DB.class.getClassLoader().getResourceAsStream("db.properties")) {
-            if (input == null) {
-                throw new RuntimeException("CRITICAL: db.properties not found!");
+        try {
+            // Load db.properties only if it exists (local dev)
+            InputStream input = DB.class.getClassLoader().getResourceAsStream("db.properties");
+            if (input != null) {
+                props.load(input);
             }
-            props.load(input);
+
+            // Prefer environment variables, fall back to db.properties
+            String url  = System.getenv("DB_URL")  != null ? System.getenv("DB_URL")  : props.getProperty("db.url");
+            String user = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : props.getProperty("db.user");
+            String pass = System.getenv("DB_PASS") != null ? System.getenv("DB_PASS") : props.getProperty("db.password");
 
             HikariConfig config = new HikariConfig();
             config.setDriverClassName("org.postgresql.Driver");
-            config.setJdbcUrl(URL);
-            config.setUsername(USER);
-            config.setPassword(PASS);
-            
-            // Pool Configuration
+            config.setJdbcUrl(url);
+            config.setUsername(user);
+            config.setPassword(pass);
+
             config.setMaximumPoolSize(10);
             config.setMinimumIdle(2);
-            config.setIdleTimeout(300000); // 5 minutes
-            config.setConnectionTimeout(20000); // 20 seconds
-            config.setMaxLifetime(1800000); // 30 minutes
-            
-            // Performance settings for PostgreSQL
+            config.setIdleTimeout(300000);
+            config.setConnectionTimeout(20000);
+            config.setMaxLifetime(1800000);
+
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
             dataSource = new HikariDataSource(config);
+
         } catch (Exception e) {
             System.err.println("CRITICAL: Failed to initialize HikariCP Connection Pool");
             e.printStackTrace();
