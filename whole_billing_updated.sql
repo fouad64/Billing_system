@@ -2917,10 +2917,11 @@ END;
 $$ LANGUAGE plpgsql;
 INSERT INTO contract_consumption (contract_id, service_package_id, rateplan_id, starting_date, ending_date, consumed, quota_limit, is_billed, bill_id) VALUES (1, 1, 1, '2026-03-01', '2026-03-31', 310, 1000, true, 17), (1, 3, 1, '2026-03-01', '2026-03-31', 42, 100, true, 17);
 --==========================================================
---       Function for adding new service package 
---
+-- 1. add_new_service_package
+-- Creates a new service bundle (Voice/Data/SMS) in the catalog.
+-- Parameters: name, type, amount, priority, price, description, is_roaming.
+-- Returns: The ID of the newly created package.
 --==========================================================
-
 CREATE OR REPLACE FUNCTION add_new_service_package(
     p_name character varying,
     p_type public.service_type,
@@ -2948,8 +2949,10 @@ END;
 $$;
 
 --==========================================================
---       Function for update service package 
---
+-- 2. update_service_package
+-- Updates an existing service package's details.
+-- Parameters: id (target), plus all package fields.
+-- Returns: The updated record as a table row.
 --==========================================================
 CREATE OR REPLACE FUNCTION update_service_package(
     p_id INTEGER,
@@ -2999,10 +3002,12 @@ END;
 $$;
 
 --==========================================================
---       Function for delete service package 
---
+-- 3. delete_service_package
+-- Safely removes a service package from the catalog.
+-- Logic: Checks for active contract consumptions or active addons before deleting
+-- to prevent foreign key or business logic violations.
+-- Parameters: p_id (ID of the package to delete).
 --==========================================================
-
 CREATE OR REPLACE FUNCTION delete_service_package(p_id INTEGER) 
 RETURNS VOID LANGUAGE plpgsql AS $$
 BEGIN
@@ -3030,8 +3035,10 @@ END;
 $$;
 
 --==========================================================
---       Function for adding new rate_plan 
---
+-- 4. create_rateplan_with_packages
+-- Atomic operation to create a Rate Plan and link it to multiple Service Packages.
+-- Parameters: name, overage rates (ror), base price, and an ARRAY of service package IDs.
+-- Logic: Creates rateplan first, then loops through IDs to populate rateplan_service_package.
 --==========================================================
 CREATE OR REPLACE FUNCTION create_rateplan_with_packages(
     p_name VARCHAR(255),
@@ -3074,12 +3081,11 @@ END;
 $$;
 
 --==========================================================
---       Function for delete rate_plan 
---
+-- 5. delete_rateplan
+-- Safely removes a rate plan and its bundle associations.
+-- Logic: Prevents deletion if any active customer contracts are currently using this plan.
+-- Parameters: p_rateplan_id.
 --==========================================================
-
-
-
 CREATE OR REPLACE FUNCTION delete_rateplan(p_rateplan_id INTEGER) RETURNS VOID
 LANGUAGE plpgsql
 AS $$
@@ -3104,12 +3110,13 @@ EXCEPTION
         RAISE EXCEPTION 'delete_rateplan failed: %', SQLERRM;
 END;
 $$;
---==========================================================
---       Function for update rate_plan 
---
---==========================================================
 
-
+--==========================================================
+-- 6. update_rateplan
+-- Multi-purpose function to update Rate Plan metadata and its linked bundles.
+-- Parameters: id, plus optional fields (COALESCE handles partial updates).
+-- Logic: If p_service_package_ids is provided, it clears and replaces old associations.
+--==========================================================
 CREATE OR REPLACE FUNCTION update_rateplan(
     p_rateplan_id INTEGER,
     p_name VARCHAR(255) DEFAULT NULL,
