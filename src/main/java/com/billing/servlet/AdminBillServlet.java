@@ -42,6 +42,11 @@ public class AdminBillServlet extends BaseServlet {
         handle(res, () -> {
             String pathParam = getPathParam(req);
             if ("generate".equals(pathParam)) {
+                String contractIdStr = req.getParameter("contractId");
+                if (contractIdStr != null) {
+                    DB.executeSelect("SELECT generate_bill(?::INT, DATE_TRUNC('month', CURRENT_DATE)::DATE)", Integer.parseInt(contractIdStr));
+                    return Map.of("success", true, "message", "Bill generated for contract #" + contractIdStr);
+                }
                 DB.executeSelect("SELECT generate_all_bills(DATE_TRUNC('month', CURRENT_DATE)::DATE)");
                 return Map.of("success", true, "message", "Billing cycle generated successfully.");
             }

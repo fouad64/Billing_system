@@ -163,7 +163,15 @@ public class DB {
     }
 
     private static String getEnvOrProp(String envKey, String propKey) {
+        // 1. Check Environment Variables
         String val = System.getenv(envKey);
+        
+        // 2. Check System Properties (-DDB_URL=...)
+        if (val == null || val.trim().isEmpty()) {
+            val = System.getProperty(envKey);
+        }
+
+        // 3. Check db.properties fallback
         if (val == null || val.trim().isEmpty() || val.contains("REPLACE_WITH_ENV_VAR")) {
             val = props.getProperty(propKey);
         }

@@ -69,26 +69,35 @@
 
   // Formatter: Logic updated because API sends MB
   // Smart Formatter: Logic updated to handle legacy SMS records and dynamic usage
-  function formatUsage(value, type, destination) {
+  function formatUsage(value, serviceId, type, destination) {
+    if (value === 0 && (serviceId === 2 || String(destination).toLowerCase() === 'internet')) return '0 MB';
     if (value === 0) return '0';
     if (!value) return '—';
 
-    // Smart Correction for legacy records: If type is Data (2) but usage is 1 and destination is numeric, treat as SMS
-    const isLegacySMS = type === 2 && value === 1 && destination && /^\d+$/.test(destination.replace(/[+]/g, ''));
-    const effectiveType = isLegacySMS ? 3 : type;
+    // Prioritize Raw Service ID: 1=Voice, 2=Data, 3=SMS
+    let effectiveType = 'other';
+    if (serviceId === 1) effectiveType = 'voice';
+    else if (serviceId === 2) effectiveType = 'data';
+    else if (serviceId === 3) effectiveType = 'sms';
+    else {
+      // Fallback to string analysis
+      const typeStr = String(type || '').toLowerCase();
+      const destStr = String(destination || '').toLowerCase();
+      if (typeStr.includes('voice') || typeStr.includes('call')) effectiveType = 'voice';
+      else if (typeStr.includes('data') || typeStr.includes('internet') || destStr === 'internet') effectiveType = 'data';
+      else if (typeStr.includes('sms')) effectiveType = 'sms';
+    }
 
     switch (effectiveType) {
-      case 1: // Voice
-        const h = Math.floor(value / 3600);
-        const m = Math.floor((value % 3600) / 60);
-        const s = value % 60;
-        return `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
+      case 'voice':
+        const mins = (value / 60).toFixed(1);
+        return `${mins} min`;
 
-      case 2: // Data
+      case 'data':
         if (value >= 1024) return (value / 1024).toFixed(2) + ' GB';
-        return value.toFixed(2) + ' MB';
+        return value.toFixed(1) + ' MB';
 
-      case 3: // SMS
+      case 'sms':
         return value + ' SMS';
 
       default:
@@ -96,18 +105,22 @@
     }
   }
 
-  const getTypeInfo = (type, value, destination) => {
-    // Smart Correction for legacy records
-    const isLegacySMS = type === 2 && value === 1 && destination && /^\d+$/.test(destination.replace(/[+]/g, ''));
-    const effectiveType = isLegacySMS ? 3 : type;
+  const getTypeInfo = (serviceId, ratedType, destination) => {
+    // Priority 1: Raw Service ID
+    if (serviceId === 1) return { label: 'Voice', class: 'badge-voice' };
+    if (serviceId === 2) return { label: 'Data', class: 'badge-data' };
+    if (serviceId === 3) return { label: 'SMS', class: 'badge-sms' };
 
-    const map = {
-      1: { label: 'Voice', class: 'badge-voice' },
-      2: { label: 'Data', class: 'badge-data' },
-      3: { label: 'SMS', class: 'badge-sms' },
-      4: { label: 'Units', class: 'badge-units' }
-    };
-    return map[effectiveType] || { label: 'Other', class: '' };
+    // Priority 2: Destination Analysis
+    if (String(destination).toLowerCase() === 'internet') return { label: 'Data', class: 'badge-data' };
+
+    // Fallback: Bundle analysis
+    const typeStr = String(ratedType || '').toLowerCase();
+    if (typeStr.includes('voice')) return { label: 'Voice', class: 'badge-voice' };
+    if (typeStr.includes('data')) return { label: 'Data', class: 'badge-data' };
+    if (typeStr.includes('sms')) return { label: 'SMS', class: 'badge-sms' };
+    
+    return { label: 'Service', class: 'badge-secondary' };
   };
 
   $effect(() => { loadCDRs(); });
@@ -138,7 +151,7 @@
     </div>
   </div>
 
-  <div class="table-card card card-static animate-fade" style="animation-delay: 0.1s">
+  <div class="animate-fade" style="animation-delay: 0.1s">
     <div class="table-wrapper">
       {#if loading}
         <div class="loading-state">
@@ -165,16 +178,21 @@
             </thead>
             <tbody>
             {#each filteredCDRs as cdr}
-              {@const typeInfo = getTypeInfo(cdr.type, cdr.duration, cdr.destination)}
+              {@const typeInfo = getTypeInfo(cdr.service_id, cdr.type, cdr.destination)}
               <tr>
                 <td><span class="id-badge">#{cdr.id}</span></td>
                 <td><span class="phone-num">{cdr.msisdn}</span></td>
                 <td><span class="phone-num">{cdr.destination || '—'}</span></td>
-                <td><span class="usage-text">{formatUsage(cdr.duration, cdr.type, cdr.destination)}</span></td>
+                <td><span class="usage-text">{formatUsage(cdr.duration, cdr.service_id, cdr.type, cdr.destination)}</span></td>
                 <td>
-                    <span class="badge {typeInfo.class} badge-base">
-                      {typeInfo.label}
-                    </span>
+                    <div style="display:flex; flex-direction:column; gap:4px">
+                      <span class="badge {typeInfo.class} badge-base" style="width:fit-content">
+                        {typeInfo.label}
+                      </span>
+                      <span style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em">
+                        {cdr.type || 'System'}
+                      </span>
+                    </div>
                 </td>
                 <td class="text-muted">{new Date(cdr.timestamp).toLocaleString()}</td>
                 <td>
@@ -238,7 +256,6 @@
   .input-group input { width: 100%; padding: 0.8rem 1rem 0.8rem 3rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 12px; color: white; transition: all 0.3s; }
   .input-group input:focus { outline: none; border-color: var(--red); box-shadow: 0 0 15px rgba(224, 8, 0, 0.2); }
 
-  .table-card { padding: 0; overflow: hidden; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); }
   .id-badge { background: rgba(255, 255, 255, 0.05); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; color: var(--text-muted); }
   .phone-num { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #3B82F6; }
 
@@ -249,6 +266,8 @@
   .badge-data { border-left-color: #22C55E; color: #22C55E; background: rgba(34, 197, 94, 0.1); }
   .badge-sms { border-left-color: #A855F7; color: #A855F7; background: rgba(168, 85, 247, 0.1); }
   .badge-units { border-left-color: #F59E0B; color: #F59E0B; background: rgba(245, 158, 11, 0.1); }
+  .badge-error { border-left-color: #EF4444; color: #EF4444; background: rgba(239, 68, 68, 0.1); }
+  .badge-secondary { border-left-color: #9CA3AF; color: #9CA3AF; background: rgba(156, 163, 175, 0.1); }
 
   .loading-state, .empty-state { padding: 4rem; text-align: center; color: var(--text-muted); }
   .spinner { width: 40px; height: 40px; border: 4px solid rgba(224, 8, 0, 0.1); border-top-color: var(--red); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }

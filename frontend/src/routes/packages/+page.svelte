@@ -1,31 +1,51 @@
 <script>
   import { fade, fly } from 'svelte/transition';
   import { page } from '$app/state';
+  import { showToast } from '$lib/toast.svelte.js';
+  import { authState } from '$lib/auth.svelte.js';
+  import Modal from '$lib/components/Modal.svelte';
   let plans = $state([]);
   let servicePkgs = $state([]);
   let loading = $state(true);
   let activeIndex = $state(1); // Default to Gold
   let interval;
-  let message = $state(null);
-  
-  // Real-time Session Logic
-  let currentUser = $state(null);
-  let authChecked = $state(false);
-
-  // Admin State
+  let provisionLoading = $state(false);
   let showAdminModal = $state(false);
   let selectedPkg = $state(null);
-  let adminTargetMsisdn = $state('');
-
-  async function checkAuth() {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) currentUser = await res.json();
-    } catch (e) {
-      currentUser = null;
+  let searchResults = $state([]);
+  let selectedContract = $state(null);
+  let showDropdown = $state(false);
+  let msisdnSearch = $state('');
+  
+  // Logical separation for UI layout
+  let welcomeGift = $derived(servicePkgs.find(p => p.name.toLowerCase().includes('gift')));
+  let addons = $derived(
+    servicePkgs
+      .filter(p => !p.name.toLowerCase().includes('gift'))
+      .sort((a, b) => {
+        // Sort by Roaming (Domestic first)
+        if (a.is_roaming !== b.is_roaming) return a.is_roaming ? 1 : -1;
+        // Sort by Type: Voice(1) -> Data(2) -> SMS(3)
+        const typeOrder = { 'voice': 1, 'data': 2, 'sms': 3 };
+        return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
+      })
+  );
+  
+  // Real-time search effect
+  $effect(() => {
+    if (msisdnSearch.length >= 2 && !selectedContract) {
+      const timer = setTimeout(async () => {
+        const res = await fetch(`/api/admin/contracts?search=${encodeURIComponent(msisdnSearch)}`);
+        if (res.ok) {
+          searchResults = await res.json();
+          showDropdown = true;
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      showDropdown = false;
     }
-    authChecked = true;
-  }
+  });
 
   async function loadData() {
     try {
@@ -43,14 +63,14 @@
   }
 
   async function buyBundle(pkg) {
-    if (!authChecked) return;
+    if (!authState.initialized) return;
     
-    if (!currentUser) {
+    if (!authState.user) {
       window.location.href = '/login?returnTo=/packages';
       return;
     }
 
-    if (currentUser.role === 'admin') {
+    if (authState.user.role === 'admin') {
       selectedPkg = pkg;
       showAdminModal = true;
       return;
@@ -61,18 +81,14 @@
   }
 
   async function adminProvision() {
-    if (!adminTargetMsisdn) return showToast('Please enter an MSISDN', true);
-    
+    if (!selectedContract) return showToast('Please select a customer first', 'error');
+    provisionLoading = true;
     try {
-      const contractRes = await fetch(`/api/admin/contracts`);
-      const contracts = await contractRes.json();
-      const contract = contracts.find(c => c.msisdn === adminTargetMsisdn);
-      
-      if (!contract) return showToast('No active contract found for this MSISDN', true);
-      
-      executePurchase(contract.id, selectedPkg.id, true);
+      executePurchase(selectedContract.id, selectedPkg.id, true);
     } catch (e) {
-      showToast('Error finding customer', true);
+      showToast('Error provisioning bundle', 'error');
+    } finally {
+      provisionLoading = false;
     }
   }
 
@@ -90,19 +106,16 @@
       if (res.ok) {
         showToast(data.message || 'Provisioning successful!');
         showAdminModal = false;
-        adminTargetMsisdn = '';
+        msisdnSearch = '';
+        selectedContract = null;
       } else {
-        showToast(data.message || 'Action failed', true);
+        showToast(data.message || 'Action failed', 'error');
       }
     } catch (e) {
-      showToast('Connection error', true);
+      showToast('Connection error', 'error');
     }
   }
 
-  function showToast(msg, isError = false) {
-    message = { text: msg, isError };
-    setTimeout(() => message = null, 4000);
-  }
 
   function startCycle() {
     stopCycle();
@@ -138,7 +151,6 @@
   }
 
   $effect(() => {
-    checkAuth();
     loadData();
     startCycle();
     return () => stopCycle();
@@ -150,36 +162,59 @@
 </svelte:head>
 
 <div class="container">
-  {#if message}
-    <div class="toast {message.isError ? 'error' : 'success'}" in:fly={{ y: -20 }} out:fade>
-      {message.text}
-    </div>
-  {/if}
 
-  {#if showAdminModal}
-    <div class="admin-modal-overlay" transition:fade onclick={() => showAdminModal = false}>
-      <div class="admin-modal card" onclick={(e) => e.stopPropagation()} in:fly={{ y: 50 }}>
-        <div class="modal-header">
-          <h3>Provision <span class="text-gradient">Package</span></h3>
-          <p>Assign <strong>{selectedPkg?.name}</strong> to a customer</p>
+  <Modal 
+    bind:show={showAdminModal} 
+    title="Provision Package" 
+    subtitle="Assign {selectedPkg?.name} to a customer"
+    type="admin"
+  >
+    <div class="form-group" style="position: relative;">
+      <label class="label">Search Customer / MSISDN</label>
+      <input 
+        class="input" 
+        type="text" 
+        bind:value={msisdnSearch} 
+        oninput={() => selectedContract = null}
+        placeholder="Type MSISDN or Name..." 
+      />
+      
+      {#if showDropdown && searchResults.length > 0}
+        <div class="search-results card-glass">
+          {#each searchResults as contract}
+            {@const pName = (contract.rateplanName || '').toLowerCase()}
+            {@const badgeClass = pName.includes('basic') ? 'badge-plan-basic' : pName.includes('premium') ? 'badge-plan-premium' : pName.includes('elite') ? 'badge-plan-elite' : pName.includes('standard') || pName.includes('gold') ? 'badge-plan-standard' : 'badge-customer'}
+            <button 
+              class="result-item" 
+              onclick={() => {
+                selectedContract = contract;
+                msisdnSearch = `${contract.msisdn} (${contract.customerName})`;
+                showDropdown = false;
+              }}
+            >
+              <div style="display:flex; flex-direction:column; gap: 2px;">
+                <span class="res-num" style="font-size: 1rem;">{contract.msisdn}</span>
+                <span class="res-name" style="font-size: 0.75rem; opacity: 0.7;">{contract.customerName}</span>
+              </div>
+              <span class="badge {badgeClass}" style="font-size:0.55rem; padding: 2px 8px; height: fit-content; border-radius: 6px;">{contract.rateplanName}</span>
+            </button>
+          {/each}
         </div>
-        <div class="modal-body">
-          <label for="msisdn">Target MSISDN</label>
-          <input 
-            type="text" 
-            id="msisdn" 
-            placeholder="e.g. 01012345678" 
-            bind:value={adminTargetMsisdn} 
-            class="admin-input"
-          />
-          <div class="modal-actions">
-            <button class="btn btn-secondary" onclick={() => showAdminModal = false}>Cancel</button>
-            <button class="btn btn-primary" onclick={adminProvision}>Confirm Provision</button>
-          </div>
-        </div>
-      </div>
+      {/if}
     </div>
-  {/if}
+    
+    {#if selectedContract}
+      <div class="selection-status animate-fade">
+        ✅ Selected: <strong>{selectedContract.msisdn}</strong> ({selectedContract.customerName})
+      </div>
+    {/if}
+    <div style="display:flex; gap: 1rem; margin-top: 2rem;">
+      <button class="btn btn-secondary" style="flex:1" onclick={() => showAdminModal = false}>Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick={adminProvision} disabled={provisionLoading}>
+        {provisionLoading ? 'Processing...' : 'Confirm Provision'}
+      </button>
+    </div>
+  </Modal>
 
   <div class="page-header">
     <div>
@@ -241,18 +276,18 @@
                 </div>
                 <button
                   onclick={() => {
-                    if (!currentUser) window.location.href = '/register?plan=' + plans[activeIndex]?.id;
-                    else if (currentUser.role === 'admin') window.location.href = '/admin/contracts';
-                    else window.location.href = '/customer/dashboard';
+                    if (!authState.user) window.location.href = '/register?plan=' + plans[activeIndex]?.id;
+                    else if (authState.user.role === 'admin') window.location.href = '/admin/contracts';
+                    else window.location.href = '/profile';
                   }}
                   class="btn btn-primary"
                   style="width: 100%; margin-top: 2rem; position: relative; z-index: 2;"
                 >
-                  {#if !authChecked}
+                  {#if !authState.initialized}
                     Checking Status...
-                  {:else if !currentUser}
+                  {:else if !authState.user}
                     Activate Now
-                  {:else if currentUser.role === 'admin'}
+                  {:else if authState.user.role === 'admin'}
                     Manage Contracts
                   {:else}
                     Back to Dashboard
@@ -318,11 +353,39 @@
       </button>
     </div>
 
+    <!-- ─── WELCOME GIFT (DEDICATED SECTION) ─── -->
+    {#if welcomeGift}
+      <div class="welcome-gift-hero animate-fade" style="margin-top: 8rem;">
+        <div class="gift-glow"></div>
+        <div class="gift-content">
+          <div class="gift-tag">One-Time Onboarding Reward</div>
+          <div class="gift-main">
+            <div class="gift-text">
+              <h2>{welcomeGift.name}</h2>
+              <p>{welcomeGift.description}</p>
+            </div>
+            <div class="gift-visual">
+              <div class="gift-price-tag">
+                <span class="val">FREE</span>
+                <span class="sub">0 EGP</span>
+              </div>
+               <button 
+                 onclick={() => buyBundle(welcomeGift)}
+                 class="btn btn-gift"
+               >
+                 {authState.user?.role === 'admin' ? 'Give to Customer' : 'Claim My Gift'}
+               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <!-- ─── BUNDLES 2.0 ─── -->
-    {#if servicePkgs.length > 0}
-      <h2 class="section-title" style="margin-top: 8rem;"><span class="text-gradient">Add-On</span> Bundles</h2>
+    {#if addons.length > 0}
+      <h2 class="section-title" style="margin-top: 6rem;"><span class="text-gradient">Add-On</span> Bundles</h2>
       <div class="bundles-grid">
-        {#each servicePkgs as pkg, i}
+        {#each addons as pkg, i}
           <div 
             id="pkg-card-{i}"
             class="bundle-card card animate-fade" 
@@ -377,11 +440,11 @@
               class="btn btn-bundle-action" 
               style="width: 100%; margin-top: 2rem;"
             >
-              {#if !authChecked}
+              {#if !authState.initialized}
                 ...
-              {:else if !currentUser}
+              {:else if !authState.user}
                 Login to Buy
-              {:else if currentUser.role === 'admin'}
+              {:else if authState.user.role === 'admin'}
                 Provision for Customer
               {:else}
                 Add to Plan
@@ -395,34 +458,6 @@
 </div>
 
 <style>
-  .toast {
-    position: fixed; top: 2rem; left: 50%; transform: translateX(-50%);
-    padding: 1rem 2rem; border-radius: 100px; z-index: 1000;
-    font-weight: 700; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-  }
-  .toast.success { background: rgba(16, 185, 129, 0.2); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
-  .toast.error { background: rgba(224, 8, 0, 0.2); color: #ef4444; border-color: rgba(224, 8, 0, 0.4); }
-
-  /* Admin Modal */
-  .admin-modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
-    z-index: 2000; display: flex; align-items: center; justify-content: center;
-  }
-  .admin-modal {
-    width: 100%; max-width: 400px; padding: 2.5rem;
-    background: rgba(20, 20, 30, 0.95); border: 1px solid var(--red);
-    box-shadow: 0 0 50px rgba(224, 8, 0, 0.2); text-align: left;
-  }
-  .modal-header h3 { font-size: 1.8rem; margin-bottom: 0.5rem; }
-  .modal-header p { color: #94a3b8; margin-bottom: 2rem; }
-  .admin-input {
-    width: 100%; padding: 12px; background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
-    color: white; font-size: 1rem; margin-top: 0.5rem; margin-bottom: 2rem;
-  }
-  .modal-actions { display: flex; gap: 1rem; }
-  .modal-actions button { flex: 1; }
 
   .nebula-outer { display: flex; align-items: center; justify-content: center; gap: 2rem; max-width: 1200px; margin: 0 auto; }
   .nav-arrow { width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; backdrop-filter: blur(10px); }
@@ -439,7 +474,11 @@
     border-radius: 32px; border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 40px 80px rgba(0, 0, 0, 0.5);
     position: relative; overflow: hidden;
-    backface-visibility: hidden; transform-style: preserve-3d; will-change: transform;
+    transform: translateZ(0); backface-visibility: hidden; will-change: transform;
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .focus-card:hover {
+    transform: translateY(-8px) translateZ(0);
   }
   .card-content-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 4rem; position: relative; z-index: 2; }
   .card-info-side { border-left: 1px solid rgba(255,255,255,0.08); padding-left: 4rem; display: flex; flex-direction: column; justify-content: center; }
@@ -507,7 +546,7 @@
     -webkit-font-smoothing: antialiased;
   }
   .bundle-card:hover { 
-    transform: translateY(-10px) scale(1.02); 
+    transform: translateY(-10px) translateZ(0); 
     border-color: rgba(255, 255, 255, 0.2);
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
   }
@@ -524,7 +563,7 @@
   .quota-unit { color: #94a3b8; font-weight: 600; font-size: 0.9rem; }
 
   .btn-bundle-action { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.1); color: white; font-weight: 700; padding: 12px; border-radius: 12px; transition: all 0.3s; position: relative; z-index: 2; }
-  .bundle-card:hover { border-color: var(--red); }
+  .bundle-card:hover { border-color: rgba(255, 255, 255, 0.3); }
   .bundle-card:hover .btn-bundle-action { background: var(--red); border-color: var(--red); box-shadow: 0 10px 20px rgba(224, 8, 0, 0.3); }
 
   .section-title { text-align: center; font-size: 3.5rem; font-weight: 900; margin-bottom: 4rem; color: white; letter-spacing: -0.05em; }
@@ -534,4 +573,127 @@
     .card-content-grid { grid-template-columns: 1fr; gap: 2rem; }
     .card-info-side { border-left: none; padding-left: 0; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); }
   }
+  /* ── Welcome Gift Hero ── */
+  .welcome-gift-hero {
+    position: relative;
+    max-width: 850px;
+    margin: 0 auto;
+    padding: 1.5rem 2.5rem;
+    background: rgba(245, 158, 11, 0.03);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 24px;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25), inset 0 0 20px rgba(245, 158, 11, 0.05);
+  }
+  .gift-glow {
+    position: absolute;
+    top: -50%;
+    left: -20%;
+    width: 60%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+  }
+  .gift-content { position: relative; z-index: 2; }
+  .gift-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    background: linear-gradient(135deg, #F59E0B, #D97706);
+    color: white;
+    font-weight: 800;
+    font-size: 0.6rem;
+    border-radius: 100px;
+    text-transform: uppercase;
+    margin-bottom: 0.8rem;
+    letter-spacing: 0.08em;
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+  }
+  .gift-main { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; }
+  .gift-text h2 { font-size: 1.8rem; font-weight: 900; color: white; margin-bottom: 0.4rem; letter-spacing: -0.04em; }
+  .gift-text p { font-size: 0.95rem; color: #94a3b8; max-width: 400px; line-height: 1.4; }
+  .gift-visual { display: flex; align-items: center; gap: 2rem; }
+  .gift-price-tag { display: flex; flex-direction: column; align-items: flex-end; }
+  .gift-price-tag .val { font-size: 2.5rem; font-weight: 950; color: #22C55E; line-height: 1; filter: drop-shadow(0 0 10px rgba(34, 197, 94, 0.3)); }
+  .gift-price-tag .sub { font-size: 1rem; color: #94a3b8; font-weight: 700; text-decoration: line-through; opacity: 0.4; }
+  .btn-gift {
+    background: #F59E0B;
+    color: black;
+    padding: 0.8rem 1.8rem;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 5px 15px rgba(245, 158, 11, 0.2);
+    animation: gift-pulse 2s infinite;
+  }
+  .btn-gift:hover { transform: translateY(-4px) translateZ(0); box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4); background: #fbbf24; }
+  
+  @keyframes gift-pulse {
+    0% { opacity: 0.9; box-shadow: 0 5px 15px rgba(245, 158, 11, 0.2); }
+    50% { opacity: 1; box-shadow: 0 5px 30px rgba(245, 158, 11, 0.5); }
+    100% { opacity: 0.9; box-shadow: 0 5px 15px rgba(245, 158, 11, 0.2); }
+  }
+
+  /* ── Searchable Dropdown ── */
+  .search-results {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    width: 100%;
+    z-index: 100;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    background: rgba(15, 15, 25, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+  }
+  .result-item {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: white;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+  }
+  .result-item:hover { background: rgba(224, 8, 0, 0.2); }
+  .res-num { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #EF4444; }
+  .res-name { font-size: 0.85rem; color: #94a3b8; }
+  .selection-status { margin-top: 1rem; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 8px; color: #22C55E; font-size: 0.9rem; }
+
+  .badge-plan-basic { 
+    background: rgba(59, 130, 246, 0.1); 
+    color: #60a5fa; 
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-left: 3px solid #3b82f6;
+  }
+  .badge-plan-standard { 
+    background: rgba(255, 255, 255, 0.05); 
+    color: #cbd5e1; 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 3px solid #94a3b8;
+  }
+  .badge-plan-premium { 
+    background: rgba(248, 113, 113, 0.1); 
+    color: #fca5a5; 
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    border-left: 3px solid #f87171;
+  }
+  .badge-plan-elite { 
+    background: rgba(139, 92, 246, 0.1); 
+    color: #a78bfa; 
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-left: 3px solid #8b5cf6;
+  }
+
 </style>

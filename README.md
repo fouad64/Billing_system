@@ -71,4 +71,19 @@ The system has been upgraded to a **Hardened Standalone JAR** architecture, prot
 
 ---
 
+## 🚀 Future Roadmap & Scalability
+
+As part of the final project wrap-up, we have identified a high-scale architectural upgrade for "Phase 3" of the FMRZ Billing System:
+
+### 💎 Phase 3: Advanced Auditability (Carrier-Grade)
+To achieve 100% financial transparency for multi-bundle consumption, we propose migrating the rating engine to a **Normalized Detailed Model**:
+
+*   **`cdr_rating_detail` Table:** Introduce a dedicated audit table to record precisely which bundle(s) were consumed for every single millisecond of a call.
+*   **Multi-Bucket Splitting:** Enable a single CDR to be split across multiple rating events (e.g., a call that starts on a "Welcome Gift" and finishes on "Overage").
+*   **Itemized Audit Logs:** Provide customer service representatives with a millisecond-accurate "Money Trail" for every customer interaction.
+*   **Wholesale vs. Retail Rating:** Implement dual-rating paths to calculate both consumer charges and inter-operator settlement costs simultaneously.
+
+---
+**FMRZ Telecom Group** | *Stabilized & Production-Ready* | 2026
+
 *This architecture ensures that the FMRZ Telecom Billing System is secure, portable, and ready for high-scale production loads.* 🏎️🛡️🚀

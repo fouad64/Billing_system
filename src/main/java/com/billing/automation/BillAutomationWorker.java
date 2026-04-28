@@ -37,13 +37,20 @@ public class BillAutomationWorker implements Runnable {
 
         // For LISTEN/NOTIFY, we should ideally use a dedicated non-pooled connection.
         // We'll fetch the credentials from the environment.
+        // Use the same logic as DB.java for robustness
         String url = System.getenv("DB_URL");
+        if (url == null || url.isEmpty()) url = System.getProperty("DB_URL");
+        
         if (url != null && url.contains("-pooler")) {
             url = url.replace("-pooler", "");
             System.out.println("ℹ [Automation] Using direct connection (no-pooler) for LISTEN/NOTIFY.");
         }
+        
         String user = System.getenv("DB_USER");
+        if (user == null || user.isEmpty()) user = System.getProperty("DB_USER");
+        
         String pass = System.getenv("DB_PASSWORD");
+        if (pass == null || pass.isEmpty()) pass = System.getProperty("DB_PASSWORD");
 
         try (Connection conn = java.sql.DriverManager.getConnection(url, user, pass)) {
             // Unwrap PostgreSQL connection to access LISTEN/NOTIFY features
@@ -93,18 +100,45 @@ public class BillAutomationWorker implements Runnable {
         try {
             String pdfPath = OUTPUT_FOLDER + "/Bill_" + billId + ".pdf";
             
-            // Load template from classpath (src/main/resources)
-            InputStream reportStream = getClass().getClassLoader().getResourceAsStream(REPORT_TEMPLATE);
+            // Load template (Try classpath first, then filesystem)
+            InputStream reportStream = BillAutomationWorker.class.getResourceAsStream("/" + REPORT_TEMPLATE);
             if (reportStream == null) {
-                throw new RuntimeException("Report template " + REPORT_TEMPLATE + " not found in classpath!");
+                // Fallback to filesystem for standalone execution
+                File f = new File(REPORT_TEMPLATE);
+                if (f.exists()) {
+                    reportStream = new java.io.FileInputStream(f);
+                } else {
+                    f = new File("target/classes/" + REPORT_TEMPLATE);
+                    if (f.exists()) {
+                        reportStream = new java.io.FileInputStream(f);
+                    }
+                }
             }
-
-            // Compile on the fly (Integrated with USER's theme)
-            JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
+            
+            if (reportStream == null) {
+                throw new RuntimeException("Report template " + REPORT_TEMPLATE + " not found in classpath or filesystem!");
+            }
+            
+            // JasperReports 7: Use JacksonUtil for strict schema validation
+            JasperReportsContext context = DefaultJasperReportsContext.getInstance();
+            net.sf.jasperreports.jackson.util.JacksonUtil jacksonUtil = net.sf.jasperreports.jackson.util.JacksonUtil.getInstance(context);
+            
+            // Load and compile
+            net.sf.jasperreports.engine.design.JasperDesign design = jacksonUtil.loadXml(reportStream, net.sf.jasperreports.engine.design.JasperDesign.class);
+            JasperReport jasperReport = JasperCompileManager.compileReport(design);
 
             // Set parameters
             Map<String, Object> params = new HashMap<>();
             params.put("BILL_ID", billId);
+            
+            // Pass Logo as a Stream (Works in JAR/Railway/Podman)
+            InputStream logoStream = BillAutomationWorker.class.getResourceAsStream("/logo.svg");
+            params.put("LOGO_PATH", logoStream);
+            
+            params.put("GROUP_NAME", "FMRZ Telecom Group");
+            params.put("COMPANY_CARE", "111 (Free from FMRZ)");
+            params.put("COMPANY_WEB", "www.fmrz-telecom.com");
+            params.put("COMPANY_EMAIL", "support@fmrz-telecom.com");
 
             // Fill report
             JasperPrint print = JasperFillManager.fillReport(jasperReport, params, conn);

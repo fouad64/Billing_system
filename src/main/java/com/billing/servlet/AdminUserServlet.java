@@ -38,12 +38,13 @@ public class AdminUserServlet extends BaseServlet {
             if (birthdate != null && birthdate.trim().isEmpty()) birthdate = null;
             
             // Using our fixed stored function to handle 2-table insertion
-            DB.executeSelect(
+            List<Map<String, Object>> result = DB.executeSelect(
                 "SELECT create_customer(?, ?, ?, ?, ?, ?::DATE) as id",
                 msisdn, "customer123", name, email, address, birthdate
             );
             
-            return Map.of("success", true, "message", "Customer created successfully");
+            int newId = ((Number) result.get(0).get("id")).intValue();
+            return Map.of("success", true, "id", newId, "message", "Customer created successfully");
         });
     }
 }

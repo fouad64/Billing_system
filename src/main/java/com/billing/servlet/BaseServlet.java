@@ -62,7 +62,10 @@ public abstract class BaseServlet extends HttpServlet {
 
     protected void sendError(HttpServletResponse res, int status, String message) throws IOException {
         res.setStatus(status);
-        sendJson(res, Map.of("error", message));
+        sendJson(res, Map.of(
+            "error", message,
+            "message", message
+        ));
     }
 
     protected String getPathParam(HttpServletRequest req) {

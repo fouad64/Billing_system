@@ -8,8 +8,7 @@ services:
       dockerfile: Dockerfile
     image: fmr-billing-system:latest
     container_name: billing-app-prod
-    ports:
-      - "8080:8080"
+    network_mode: host
     env_file:
       - .env
     environment:

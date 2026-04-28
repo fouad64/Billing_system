@@ -1,9 +1,12 @@
 <script>
+  import { showToast } from '$lib/toast.svelte.js';
+  import { authState } from '$lib/auth.svelte.js';
+  import Modal from '$lib/components/Modal.svelte';
   let customers = $state([]);
   let search = $state('');
   let showModal = $state(false);
-  let showSuccess = $state(false);
-  let error = $state('');
+  let loading = $state(false);
+  let createLoading = $state(false);
   let newCustomer = $state({ name: '', email: '', msisdn: '', address: '', birthdate: '' });
 
   async function load() {
@@ -13,23 +16,32 @@
 
   async function createCustomer(e) {
     e.preventDefault();
-    const res = await fetch('/api/admin/customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newCustomer)
-    });
-    if (res.ok) {
-      showModal = false;
-      showSuccess = true;
-      newCustomer = { name: '', email: '', msisdn: '', address: '', birthdate: '' };
-      load();
-    } else {
-      const msg = await res.text();
-      error = msg || 'Failed to create customer';
+    createLoading = true;
+    try {
+      const res = await fetch('/api/admin/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCustomer)
+      });
+      if (res.ok) {
+        showToast('Customer profile created successfully!');
+        showModal = false;
+        newCustomer = { name: '', email: '', msisdn: '', address: '', birthdate: '' };
+        load();
+      } else {
+        const msg = await res.text();
+        showToast(msg || 'Failed to create customer', 'error');
+      }
+    } catch (e) {
+      showToast('Connection error', 'error');
+    } finally {
+      createLoading = false;
     }
   }
 
-  $effect(() => { load(); });
+  $effect(() => {
+    load();
+  });
 </script>
 
 <svelte:head>
@@ -50,7 +62,7 @@
         </span>
         <input class="input" style="width:300px; padding-left: 2.5rem;" placeholder="Search directory..." bind:value={search} oninput={() => setTimeout(load, 300)} aria-label="Search customers" />
       </div>
-      <button class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.5rem;" onclick={() => { showModal = true; error = ''; }}>
+      <button class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.5rem;" onclick={() => { showModal = true; }}>
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
         Add New Customer
       </button>
@@ -60,7 +72,7 @@
   <div class="table-wrapper static-table animate-fade">
     <table>
       <thead>
-        <tr><th>ID</th><th>MSISDN</th><th>Name</th><th>Email</th><th>Address</th><th>Birthdate</th></tr>
+        <tr><th>ID</th><th>MSISDN</th><th>Name</th><th>Email</th><th>Address</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {#each customers as c}
@@ -70,7 +82,11 @@
             <td class="customer-name" style="color: #FFFFFF !important;">{c.name}</td>
             <td style="color: #94A3B8 !important; font-size: 0.9rem; font-weight: 500;">{c.email||'—'}</td>
             <td style="color: #FB7185 !important; font-size: 0.9rem; font-weight: 500;">{c.address||'—'}</td>
-            <td style="color: #64748B !important; font-size: 0.9rem; font-weight: 600;">{c.birthdate||'—'}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; border-color: var(--red); color: var(--red-light);" onclick={() => window.location.href = `/admin/contracts?customerId=${c.id}`}>
+                Provision Line
+              </button>
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -78,13 +94,7 @@
   </div>
 </div>
 
-{#if showModal}
-<div class="modal-overlay" onclick={() => showModal = false} role="button" tabindex="0" onkeydown={(e) => e.key === 'Escape' && (showModal = false)}>
-  <div class="modal card-glass animate-fade" onclick={e => e.stopPropagation()} role="dialog">
-    <h2>Add New Customer</h2>
-    {#if error}
-      <div class="error-msg animate-fade">{error}</div>
-    {/if}
+  <Modal bind:show={showModal} title="Add New Customer" type="admin">
     <form onsubmit={createCustomer}>
       <div class="form-group">
         <label class="label">Full Name</label>
@@ -108,30 +118,13 @@
       </div>
       <div style="display:flex;gap:1rem;justify-content:flex-end;margin-top:2rem">
         <button type="button" class="btn btn-secondary" onclick={() => showModal = false}>Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Profile</button>
+        <button type="submit" class="btn btn-primary" disabled={createLoading}>
+          {createLoading ? 'Creating...' : 'Create Profile'}
+        </button>
       </div>
     </form>
-  </div>
-</div>
-{/if}
+  </Modal>
 
-{#if showSuccess}
-<div class="modal-overlay" onclick={() => showSuccess = false} role="button" tabindex="0" onkeydown={(e) => e.key === 'Escape' && (showSuccess = false)}>
-  <div class="modal card-glass animate-fade" onclick={e => e.stopPropagation()} role="dialog">
-    <div style="text-align:center;padding:1rem">
-      <div style="margin-bottom:1.5rem">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-      </div>
-      <h2>Profile Created!</h2>
-      <p class="text-muted" style="margin-bottom:2rem">The customer profile has been successfully saved to the database.</p>
-      <div style="display:flex;flex-direction:column;gap:1rem">
-        <a href="/admin/contracts" class="btn btn-primary">Go to Contracts to Assign Line</a>
-        <button class="btn btn-secondary" onclick={() => showSuccess = false}>Stay on Directory</button>
-      </div>
-    </div>
-  </div>
-</div>
-{/if}
 
 <style>
   .static-table {
@@ -161,6 +154,4 @@
   .phone-num { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
   .customer-name { font-weight: 700; font-size: 1.05rem; }
 
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:200; backdrop-filter:blur(8px); }
-  .modal { width:100%; max-width:480px; padding:2.5rem; transform:none !important; }
 </style>

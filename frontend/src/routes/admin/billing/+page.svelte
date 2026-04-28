@@ -1,4 +1,6 @@
 <script>
+  import { showToast } from '$lib/toast.svelte.js';
+  import ConfirmModal from '$lib/components/ConfirmModal.svelte';
   let contractId = $state('');
   let bills = $state([]);
   let missingBills = $state([]);
@@ -7,6 +9,12 @@
   let showAudit = $state(false);
   let processingBills = $state(false);
   let selectedIds = $state(new Set());
+
+  // Confirm Modals State
+  let showRunConfirm = $state(false);
+  let showPayConfirm = $state(false);
+  let showBulkConfirm = $state(false);
+  let targetBillId = $state(null);
 
   async function loadData() {
     loading = true;
@@ -27,52 +35,88 @@
   }
 
   async function forceRunBilling() {
-    if (!confirm("This will generate bills for all active contracts for the current month. Proceed?")) return;
+    showRunConfirm = true;
+  }
+
+  async function executeRunBilling() {
+    showRunConfirm = false;
     processingBills = true;
     try {
       const res = await fetch('/api/admin/bills/generate', { method: 'POST', credentials: 'include' });
       if (res.ok) {
-        alert("Billing cycle completed successfully!");
+        showToast("Billing cycle completed successfully!");
         loadData();
       } else {
-        alert("Failed to run billing cycle.");
+        showToast("Failed to run billing cycle.", 'error');
       }
     } catch (e) {
-      alert("Network error.");
+      showToast("Network error.", 'error');
+    } finally {
+      processingBills = false;
+    }
+  }
+
+  async function generateSingleBill(cid) {
+    processingBills = true;
+    try {
+      const res = await fetch(`/api/admin/bills/generate?contractId=${cid}`, { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        showToast(`Statement generated for Contract #${cid}`);
+        loadData();
+      } else {
+        showToast("Generation failed.", 'error');
+      }
+    } catch (e) {
+      showToast("Network error.", 'error');
     } finally {
       processingBills = false;
     }
   }
 
   async function payBill(billId) {
-    if (!confirm(`Mark Bill #${billId} as paid?`)) return;
+    targetBillId = billId;
+    showPayConfirm = true;
+  }
+
+  async function executePayBill() {
+    if (!targetBillId) return;
+    const billId = targetBillId;
+    showPayConfirm = false;
     try {
       const res = await fetch(`/api/admin/bills/pay?billId=${billId}`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
+        showToast(`Bill #${billId} marked as paid.`);
         selectedIds.delete(billId);
+        selectedIds = new Set(selectedIds); // Trigger reactivity
         loadData();
       } else {
-        alert("Payment update failed.");
+        showToast("Payment update failed.", 'error');
       }
     } catch (e) {
-      alert("Network error.");
+      showToast("Network error.", 'error');
     }
   }
 
   async function bulkPay() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Mark ${selectedIds.size} bills as paid?`)) return;
+    showBulkConfirm = true;
+  }
+
+  async function executeBulkPay() {
+    showBulkConfirm = false;
     const ids = Array.from(selectedIds).join(',');
     try {
       const res = await fetch(`/api/admin/bills/pay-bulk?ids=${ids}`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
+        showToast(`${selectedIds.size} bills marked as paid.`);
         selectedIds.clear();
+        selectedIds = new Set(selectedIds); // Trigger reactivity
         loadData();
       } else {
-        alert("Bulk payment failed.");
+        showToast("Bulk payment failed.", 'error');
       }
     } catch (e) {
-      alert("Network error.");
+      showToast("Network error.", 'error');
     }
   }
 
@@ -90,6 +134,7 @@
     }
     selectedIds = new Set(selectedIds); // Trigger reactivity
   }
+
 
   $effect(() => {
     loadData();
@@ -114,9 +159,34 @@
     </button>
   </div>
 
+  <ConfirmModal 
+    bind:show={showRunConfirm} 
+    title="Run Billing Cycle" 
+    message="This will generate bills for all active contracts for the current month. This process may take a few seconds as it triggers the automated PDF generator."
+    onconfirm={executeRunBilling}
+    loading={processingBills}
+    type="admin"
+  />
+
+  <ConfirmModal 
+    bind:show={showPayConfirm} 
+    title="Confirm Payment" 
+    message="Are you sure you want to mark Bill #{targetBillId} as paid? This will update the collection status in the financial records."
+    onconfirm={executePayBill}
+    type="admin"
+  />
+
+  <ConfirmModal 
+    bind:show={showBulkConfirm} 
+    title="Bulk Payment" 
+    message="Are you sure you want to mark {selectedIds.size} selected bills as paid? This action cannot be undone."
+    onconfirm={executeBulkPay}
+    type="admin"
+  />
+
   <!-- Summary Stats Cards -->
   <div class="stats-grid">
-    <div class="card stat-card info-card card-static">
+    <div class="card stat-card info-card">
       <div class="stat-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       </div>
@@ -125,7 +195,7 @@
         <span class="stat-value">{stats.revenue || 0} EGP</span>
       </div>
     </div>
-    <div class="card stat-card info-card card-static">
+    <div class="card stat-card info-card">
       <div class="stat-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
       </div>
@@ -134,7 +204,7 @@
         <span class="stat-value">{stats.pending_bills || 0}</span>
       </div>
     </div>
-    <div class="card stat-card info-card card-static" onclick={() => showAudit = !showAudit} style="cursor:pointer">
+    <div class="card stat-card info-card" onclick={() => showAudit = !showAudit} style="cursor:pointer">
       <div class="stat-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={missingBills.length > 0 ? "var(--red)" : "var(--text-muted)"} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </div>
@@ -147,22 +217,46 @@
   </div>
 
   {#if showAudit && missingBills.length > 0}
-    <div class="audit-section animate-fade card" style="border-color: var(--red); margin-bottom: 2rem; background: rgba(224, 8, 0, 0.05)">
-      <h2 style="color: var(--red); margin-bottom: 1rem;">⚠️ Billing Audit: Missing Statements</h2>
-      <p class="text-muted" style="margin-bottom: 1.5rem;">The following active contracts have no bill generated for the current month.</p>
-      <div class="table-wrapper">
+    <div class="audit-section animate-fade">
+      <div class="audit-header" style="margin-top: 1rem; border: none;">
+        <div class="audit-badge">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Critical Audit
+        </div>
+        <div class="audit-text">
+          <h2>Pending Billing Statements</h2>
+          <p>These active contracts have no generated bills for the current cycle.</p>
+        </div>
+      </div>
+      
+      <div class="table-wrapper" style="border-color: var(--red); margin-bottom: 3rem; background: rgba(224, 8, 0, 0.05);">
         <table>
           <thead>
-            <tr><th>Contract ID</th><th>MSISDN</th><th>Customer</th><th>Last Bill Date</th><th>Action</th></tr>
+            <tr><th>Contract ID</th><th>Customer / MSISDN</th><th>Last Known Bill</th><th>Action Required</th></tr>
           </thead>
           <tbody>
             {#each missingBills as m}
               <tr>
-                <td><span class="id-badge">#{m.id}</span></td>
-                <td><span class="phone-num">{m.msisdn}</span></td>
-                <td>{m.customer_name}</td>
-                <td>{m.last_bill_date || 'Never'}</td>
-                <td><button class="btn btn-secondary btn-sm" onclick={forceRunBilling}>Generate</button></td>
+                <td><span class="id-badge">#{m.contract_id}</span></td>
+                <td>
+                  <div class="customer-cell">
+                    <span class="name">{m.customer_name || 'System User'}</span>
+                    <span class="msisdn text-muted">{m.msisdn}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="text-muted" style="font-size: 0.9rem;">
+                    {m.last_bill_date ? `Last bill: ${m.last_bill_date}` : '⚠️ No history found'}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-secondary btn-sm" 
+                          style="border-color: var(--red); color: var(--red-light);" 
+                          onclick={() => generateSingleBill(m.contract_id)}
+                          disabled={processingBills}>
+                    {processingBills ? '...' : 'Generate Statement'}
+                  </button>
+                </td>
               </tr>
             {/each}
           </tbody>
@@ -350,4 +444,42 @@
   
   .text-gradient { background: linear-gradient(135deg, var(--red), var(--red-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
   .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
+
+  /* ── Missing Statements Refinement ── */
+  .card-static {
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    background: rgba(15, 15, 25, 0.6) !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  .card-static:hover {
+    transform: none !important;
+    background: rgba(15, 15, 25, 0.7) !important;
+  }
+
+  .audit-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .audit-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(224, 8, 0, 0.1);
+    color: var(--red-light);
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-weight: 800;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid rgba(224, 8, 0, 0.2);
+  }
+  .audit-text h2 { font-size: 1.5rem; font-weight: 900; color: white; margin-bottom: 4px; }
+  .audit-text p { font-size: 0.95rem; color: #94a3b8; line-height: 1.4; max-width: 600px; }
 </style>

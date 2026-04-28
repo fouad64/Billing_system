@@ -33,7 +33,9 @@ public class CustomerProfileServlet extends BaseServlet {
             synchronized (CustomerProfileServlet.class) {
                 if (cachedReport == null) {
                     try (InputStream is = getClass().getResourceAsStream("/invoice.jrxml")) {
-                        cachedReport = JasperCompileManager.compileReport(is);
+                        net.sf.jasperreports.engine.JasperReportsContext context = net.sf.jasperreports.engine.DefaultJasperReportsContext.getInstance();
+                        net.sf.jasperreports.engine.design.JasperDesign design = net.sf.jasperreports.jackson.util.JacksonUtil.getInstance(context).loadXml(is, net.sf.jasperreports.engine.design.JasperDesign.class);
+                        cachedReport = JasperCompileManager.compileReport(design);
                     } catch (IOException e) {
                         throw new JRException("Failed to load invoice.jrxml", e);
                     }
@@ -74,7 +76,9 @@ public class CustomerProfileServlet extends BaseServlet {
             }
             else if ("/invoices".equals(path)) {
                 List<Map<String, Object>> list = DB.executeSelect(
-                    "SELECT b.id, b.billing_date as \"generationDate\", c.msisdn, b.taxes, b.recurring_fees as \"recurringFees\", b.one_time_fees as \"oneTimeFees\" " +
+                    "SELECT b.id, CAST(b.billing_date AS VARCHAR) as \"generationDate\", c.msisdn, " +
+                    "b.taxes, b.recurring_fees as \"recurringFees\", b.one_time_fees as \"oneTimeFees\", " +
+                    "b.total_amount as \"totalAmount\", b.status " +
                     "FROM bill b " +
                     "JOIN contract c ON b.contract_id = c.id " +
                     "WHERE c.user_account_id = ? ORDER BY b.billing_date DESC", userId);
