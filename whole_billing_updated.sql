@@ -405,13 +405,13 @@ BEGIN
     -- [RULE] Welcome Bonus is only once per lifetime per customer (across all their lines)
     IF EXISTS (
         SELECT 1 FROM service_package sp
-        WHERE sp.id = p_service_package_id AND sp.name = 'Welcome Bonus'
+        WHERE sp.id = p_service_package_id AND sp.name = '🎁 Welcome Gift'
     ) AND EXISTS (
         SELECT 1 FROM contract_addon ca
         JOIN service_package sp ON ca.service_package_id = sp.id
         JOIN contract c ON ca.contract_id = c.id
         WHERE c.user_account_id = (SELECT user_account_id FROM contract WHERE id = p_contract_id)
-          AND sp.name = 'Welcome Bonus'
+          AND sp.name = '🎁 Welcome Gift'
     ) THEN
         RAISE EXCEPTION 'Welcome Bonus can only be provisioned once per customer';
     END IF;
@@ -2084,13 +2084,18 @@ VALUES
 ------------------------------------------------------------
 INSERT INTO service_package (name, type, amount, priority, price, is_roaming, description)
 VALUES
-    ('Voice Pack',         'voice',      2000, 1, 75,    FALSE, '2000 local minutes per month'),
-    ('Data Pack',          'data',      10000, 1, 150,   FALSE, '10GB data per month'),
-    ('SMS Pack',           'sms',         500, 1, 25,    FALSE, '500 SMS per month'),
-    ('Welcome Bonus',      'free_units',10000, 2,  0,    FALSE, '10GB free data for new customers'),
-    ('Roaming Voice Pack', 'voice',       100, 1, 250,   TRUE,  '100 roaming minutes'),
-    ('Roaming Data Pack',  'data',       2000, 1, 500,   TRUE,  '2GB roaming data'),
-    ('Roaming SMS Pack',   'sms',         100, 1, 100,   TRUE,  '100 roaming SMS');
+    -- Group 1: Domestic Standard Packs
+    ('Voice Pack',         'voice',      2000, 2,  75,   FALSE, '2000 local minutes per month'),
+    ('Data Pack',          'data',      10000, 2,  150,  FALSE, '10GB data per month'),
+    ('SMS Pack',           'sms',         500, 2,  25,   FALSE, '500 SMS per month'),
+    
+    -- Group 2: The Welcome Experience (High Priority)
+    ('🎁 Welcome Gift',    'free_units', 10000, 1,  0,    FALSE, '10GB free data for new customers'),
+    
+    -- Group 3: Global Roaming Addons
+    ('Roaming Voice Pack', 'voice',       100, 2, 250,   TRUE,  '100 roaming minutes'),
+    ('Roaming Data Pack',  'data',       2000, 2, 500,   TRUE,  '2GB roaming data'),
+    ('Roaming SMS Pack',   'sms',         100, 2, 100,   TRUE,  '100 roaming SMS');
 
 ------------------------------------------------------------
 -- RATEPLAN → PACKAGES

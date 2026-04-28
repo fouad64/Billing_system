@@ -6,10 +6,8 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
 		proxy: {
-			'/api': {
-				target: 'http://localhost:8080',
-				changeOrigin: true
-			}
+			'/api': 'http://localhost:8080',
+			'/health': 'http://localhost:8080'
 		}
 	}
 });

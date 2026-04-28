@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jasperReport name="Invoice_FMRZ" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
 	<parameter name="BILL_ID" class="java.lang.Integer"/>
-	<parameter name="LOGO_PATH" class="java.lang.Object"/>
+	<parameter name="LOGO_PATH" class="java.lang.String"/>
 	<parameter name="GROUP_NAME" class="java.lang.String"/>
 	<parameter name="COMPANY_CARE" class="java.lang.String"/>
 	<parameter name="COMPANY_WEB" class="java.lang.String"/>
@@ -17,9 +17,7 @@
 			COALESCE(b.voice_usage, 0) AS voice_usage,
 			COALESCE(b.data_usage, 0) AS data_usage,
 			COALESCE(b.sms_usage, 0) AS sms_usage,
-			COALESCE(b.overage_charge, 0) AS overage_charge,
-			COALESCE(b.roaming_charge, 0) AS roaming_charge,
-			COALESCE(b.promotional_discount, 0) AS promotional_discount,
+			COALESCE(b.ror_charge, 0) AS ror_charge,
 			COALESCE(b.taxes, 0) AS taxes,
 			COALESCE(b.total_amount, 0) AS total_amount,
 			COALESCE(b.status::text, 'issued') AS bill_status,
@@ -43,14 +41,12 @@
 	<field name="voice_usage" class="java.lang.Integer"/>
 	<field name="data_usage" class="java.lang.Integer"/>
 	<field name="sms_usage" class="java.lang.Integer"/>
-	<field name="overage_charge" class="java.math.BigDecimal"/>
-	<field name="roaming_charge" class="java.math.BigDecimal"/>
+	<field name="ror_charge" class="java.math.BigDecimal"/>
 	<field name="taxes" class="java.math.BigDecimal"/>
 	<field name="total_amount" class="java.math.BigDecimal"/>
 	<field name="bill_status" class="java.lang.String"/>
 	<field name="msisdn" class="java.lang.String"/>
 	<field name="rateplan_name" class="java.lang.String"/>
-	<field name="promotional_discount" class="java.math.BigDecimal"/>
 
 	<background height="802">
 		<element kind="rectangle" x="0" y="0" width="555" height="802" backcolor="#000000" mode="Opaque">
@@ -90,7 +86,7 @@
 	</title>
 
 	<detail>
-		<band height="600">
+		<band height="540">
 			<!-- ===== CUSTOMER DATA CARD ===== -->
 			<element kind="rectangle" x="10" y="8" width="258" height="138" backcolor="#141414" radius="10" mode="Opaque">
 				<pen lineWidth="0.5" lineColor="#2A2A2A"/>
@@ -160,7 +156,7 @@
 				<text><![CDATA[VOICE MINS]]></text>
 			</element>
 			<element kind="textField" x="47" y="248" width="70" height="24" forecolor="#FFFFFF" fontSize="16.0" bold="true" hTextAlign="Center" blankWhenNull="true">
-				<expression><![CDATA[$F{voice_usage} / 60]]></expression>
+				<expression><![CDATA[$F{voice_usage}]]></expression>
 			</element>
 			<!-- Vertical divider 1 -->
 			<element kind="line" x="188" y="200" width="1" height="70" forecolor="#2A2A2A"/>
@@ -172,7 +168,7 @@
 				<text><![CDATA[DATA GB]]></text>
 			</element>
 			<element kind="textField" x="242" y="248" width="70" height="24" forecolor="#FFFFFF" fontSize="16.0" bold="true" hTextAlign="Center" blankWhenNull="true">
-				<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format($F{data_usage} / 1024.0)]]></expression>
+				<expression><![CDATA[$F{data_usage}]]></expression>
 			</element>
 			<!-- Vertical divider 2 -->
 			<element kind="line" x="377" y="200" width="1" height="70" forecolor="#2A2A2A"/>
@@ -194,83 +190,62 @@
 			<element kind="staticText" x="24" y="306" width="260" height="18" forecolor="#FF0000" fontSize="12.0" bold="true">
 				<text><![CDATA[FINANCIAL SUMMARY (INC. TAXES)]]></text>
 			</element>
-			<!-- ===== FINANCIAL SUMMARY BOX ===== -->
-			<element kind="rectangle" x="10" y="330" width="535" height="165" backcolor="#121212" radius="10" mode="Opaque">
-				<pen lineWidth="0.5" lineColor="#333333"/>
+			<!-- Charges card -->
+			<element kind="rectangle" x="10" y="330" width="535" height="115" backcolor="#141414" radius="10" mode="Opaque">
+				<pen lineWidth="0.5" lineColor="#2A2A2A"/>
 			</element>
-
-			<!-- Monthly Subscription -->
+			<!-- Subscription row -->
 			<element kind="staticText" x="30" y="342" width="260" height="18" forecolor="#E0E0E0" fontSize="10.0">
 				<text><![CDATA[Monthly Subscription]]></text>
 			</element>
 			<element kind="textField" x="420" y="342" width="110" height="18" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{recurring_fees} + " EGP"]]></expression>
 			</element>
-
 			<!-- Overage row -->
 			<element kind="staticText" x="30" y="364" width="260" height="18" forecolor="#E0E0E0" fontSize="10.0">
-				<text><![CDATA[Domestic Overage]]></text>
+				<text><![CDATA[Overage / Roaming Charges]]></text>
 			</element>
 			<element kind="textField" x="420" y="364" width="110" height="18" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
-				<expression><![CDATA[$F{overage_charge} + " EGP"]]></expression>
+				<expression><![CDATA[$F{ror_charge} + " EGP"]]></expression>
 			</element>
-
-			<!-- Roaming row -->
-			<element kind="staticText" x="30" y="386" width="260" height="18" forecolor="#E0E0E0" fontSize="10.0">
-				<text><![CDATA[Roaming Charges]]></text>
-			</element>
-			<element kind="textField" x="420" y="386" width="110" height="18" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
-				<expression><![CDATA[$F{roaming_charge} + " EGP"]]></expression>
-			</element>
-
-			<!-- Promotional Savings -->
-			<element kind="staticText" x="30" y="408" width="260" height="18" forecolor="#4CAF50" fontSize="10.0" bold="true">
-				<text><![CDATA[Promotional Savings]]></text>
-			</element>
-			<element kind="textField" x="420" y="408" width="110" height="18" forecolor="#4CAF50" fontSize="10.0" bold="true" hTextAlign="Right" blankWhenNull="true">
-				<expression><![CDATA["-" + $F{promotional_discount} + " EGP"]]></expression>
-			</element>
-
 			<!-- Taxes row -->
-			<element kind="staticText" x="30" y="430" width="260" height="18" forecolor="#E0E0E0" fontSize="10.0">
+			<element kind="staticText" x="30" y="386" width="260" height="18" forecolor="#E0E0E0" fontSize="10.0">
 				<text><![CDATA[Government Tax (14%)]]></text>
 			</element>
-			<element kind="textField" x="420" y="430" width="110" height="18" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="386" width="110" height="18" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{taxes} + " EGP"]]></expression>
 			</element>
-
 			<!-- Divider line -->
-			<element kind="line" x="30" y="455" width="500" height="1" forecolor="#333333"/>
-			
+			<element kind="line" x="30" y="410" width="500" height="1" forecolor="#333333"/>
 			<!-- One-time row -->
-			<element kind="staticText" x="30" y="465" width="260" height="18" forecolor="#E0E0E0" fontSize="10.0">
+			<element kind="staticText" x="30" y="416" width="260" height="18" forecolor="#E0E0E0" fontSize="10.0">
 				<text><![CDATA[One-time Fees]]></text>
 			</element>
-			<element kind="textField" x="420" y="465" width="110" height="18" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="416" width="110" height="18" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{one_time_fees} + " EGP"]]></expression>
 			</element>
 
 			<!-- ===== TOTAL DUE BAR ===== -->
-			<element kind="rectangle" x="10" y="520" width="535" height="60" backcolor="#1A0505" radius="10" mode="Opaque">
+			<element kind="rectangle" x="10" y="460" width="535" height="60" backcolor="#1A0505" radius="10" mode="Opaque">
 				<pen lineWidth="1.0" lineColor="#FF0000"/>
 			</element>
 			<!-- Red left accent stripe -->
-			<element kind="rectangle" x="10" y="520" width="5" height="60" backcolor="#FF0000" mode="Opaque">
+			<element kind="rectangle" x="10" y="460" width="5" height="60" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
 			<!-- Red circle with EGP symbol -->
-			<element kind="ellipse" x="28" y="520" width="40" height="40" backcolor="#FF0000" mode="Opaque">
+			<element kind="ellipse" x="28" y="470" width="40" height="40" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
-			<element kind="staticText" x="28" y="526" width="40" height="28" forecolor="#FFFFFF" fontSize="18.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<element kind="staticText" x="28" y="476" width="40" height="28" forecolor="#FFFFFF" fontSize="18.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
 				<text><![CDATA[E£]]></text>
 			</element>
 			<!-- TOTAL DUE label -->
-			<element kind="staticText" x="80" y="522" width="220" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" vTextAlign="Middle">
+			<element kind="staticText" x="80" y="472" width="220" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" vTextAlign="Middle">
 				<text><![CDATA[TOTAL DUE]]></text>
 			</element>
 			<!-- Total amount -->
-			<element kind="textField" x="310" y="518" width="235" height="44" forecolor="#FF0000" fontSize="24.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
+			<element kind="textField" x="310" y="468" width="235" height="44" forecolor="#FF0000" fontSize="24.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
 				<expression><![CDATA[$F{total_amount} + " EGP"]]></expression>
 			</element>
 		</band>

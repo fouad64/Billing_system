@@ -18,7 +18,9 @@ public class Bill {
     private int dataUsage;  // Total MB used in this period
     private int smsUsage;   // Total SMS sent in this period
     
-    private BigDecimal rorCharge; // Rate of Return / Usage charges
+    private BigDecimal overageCharge;
+    private BigDecimal roamingCharge;
+    private BigDecimal rorCharge; // Kept for legacy compatibility
     private BigDecimal taxes;
     private BigDecimal totalAmount;
     
@@ -56,6 +58,12 @@ public class Bill {
 
     public int getSmsUsage() { return smsUsage; }
     public void setSmsUsage(int smsUsage) { this.smsUsage = smsUsage; }
+
+    public BigDecimal getOverageCharge() { return overageCharge; }
+    public void setOverageCharge(BigDecimal overageCharge) { this.overageCharge = overageCharge; }
+
+    public BigDecimal getRoamingCharge() { return roamingCharge; }
+    public void setRoamingCharge(BigDecimal roamingCharge) { this.roamingCharge = roamingCharge; }
 
     public BigDecimal getRorCharge() { return rorCharge; }
     public void setRorCharge(BigDecimal rorCharge) { this.rorCharge = rorCharge; }

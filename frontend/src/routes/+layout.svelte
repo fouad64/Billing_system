@@ -13,6 +13,15 @@
 	$effect(() => {
 		checkAuth();
 	});
+
+	// Global Security Guard
+	$effect(() => {
+		if (authState.initialized && $page.url.pathname.startsWith('/admin')) {
+			if (!authState.user || authState.user.role !== 'admin') {
+				window.location.href = `/login?returnTo=${$page.url.pathname}`;
+			}
+		}
+	});
 </script>
 
 <div class="app">
@@ -100,7 +109,16 @@
 		</div>
 	</nav>
 
-	<main class="main-content">{@render children()}</main>
+	<main class="main-content">
+		{#if $page.url.pathname.startsWith('/admin') && !authState.initialized}
+			<div class="verify-screen">
+				<div class="spinner"></div>
+				<p>Verifying Security Credentials...</p>
+			</div>
+		{:else}
+			{@render children()}
+		{/if}
+	</main>
 	<footer class="footer"><div class="container"><p>© 2026 FMRZ Telecom Billing — ITI Project</p></div></footer>
 
 	{#if toastState.message}
@@ -234,4 +252,22 @@
 			display: none;
 		}
 	}
+	.verify-screen {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 60vh;
+		gap: 1.5rem;
+		color: var(--text-secondary);
+	}
+	.spinner {
+		width: 40px;
+		height: 40px;
+		border: 3px solid rgba(255, 255, 255, 0.05);
+		border-top-color: var(--red);
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+	@keyframes spin { to { transform: rotate(360deg); } }
 </style>

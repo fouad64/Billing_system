@@ -44,15 +44,18 @@ public class InvoicePDFGenerator {
     // Cache the compiled template — compile once, reuse forever
     // This avoids the 2-5 second compilation on every request
     private static JasperReport compiledReport = null;
+    private static final String REPORT_TEMPLATE = "invoice.jrxml";
 
     // Compile template on first use (lazy initialization)
     private static JasperReport getCompiledReport() throws JRException {
         if (compiledReport == null) {
-            // Load .jrxml from classpath (src/main/resources/)
-            InputStream stream = InvoicePDFGenerator.class
-                .getResourceAsStream("/reports/invoice.jrxml");
+            // Load template from classpath (src/main/resources)
+            InputStream reportStream = InvoicePDFGenerator.class.getResourceAsStream("/" + REPORT_TEMPLATE);
+            if (reportStream == null) {
+                throw new RuntimeException("Report template " + REPORT_TEMPLATE + " not found in classpath!");
+            }
             // Compile XML → binary report object
-            compiledReport = JasperCompileManager.compileReport(stream);
+            compiledReport = JasperCompileManager.compileReport(reportStream);
         }
         return compiledReport;
     }

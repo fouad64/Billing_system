@@ -1,15 +1,12 @@
 <script>
   import { showToast } from '$lib/toast.svelte.js';
+  import { authState } from '$lib/auth.svelte.js';
   import Modal from '$lib/components/Modal.svelte';
   let customers = $state([]);
   let search = $state('');
   let showModal = $state(false);
-  let showAdminModal = $state(false);
-  let error = $state('');
   let loading = $state(false);
   let createLoading = $state(false);
-  let provisionLoading = $state(false);
-  let adminTargetMsisdn = $state('');
   let newCustomer = $state({ name: '', email: '', msisdn: '', address: '', birthdate: '' });
 
   async function load() {
@@ -42,27 +39,9 @@
     }
   }
 
-  async function adminProvision() {
-    if (!adminTargetMsisdn) return showToast('Please enter an MSISDN', 'error');
-    provisionLoading = true;
-    try {
-      const res = await fetch(`/api/admin/provision/${adminTargetMsisdn}`, { method: 'POST' });
-      if (res.ok) {
-        showToast('Provisioning successful!');
-        showAdminModal = false;
-        adminTargetMsisdn = '';
-      } else {
-        const msg = await res.text();
-        showToast(msg || 'Provisioning failed', 'error');
-      }
-    } catch (e) {
-      showToast('Connection error', 'error');
-    } finally {
-      provisionLoading = false;
-    }
-  }
-
-  $effect(() => { load(); });
+  $effect(() => {
+    load();
+  });
 </script>
 
 <svelte:head>
@@ -83,18 +62,17 @@
         </span>
         <input class="input" style="width:300px; padding-left: 2.5rem;" placeholder="Search directory..." bind:value={search} oninput={() => setTimeout(load, 300)} aria-label="Search customers" />
       </div>
-      <button class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.5rem;" onclick={() => { showModal = true; error = ''; }}>
+      <button class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.5rem;" onclick={() => { showModal = true; }}>
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
         Add New Customer
       </button>
-      <button class="btn btn-secondary" onclick={() => showAdminModal = true}>Provision</button>
     </div>
   </div>
 
   <div class="table-wrapper static-table animate-fade">
     <table>
       <thead>
-        <tr><th>ID</th><th>MSISDN</th><th>Name</th><th>Email</th><th>Address</th><th>Birthdate</th></tr>
+        <tr><th>ID</th><th>MSISDN</th><th>Name</th><th>Email</th><th>Address</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {#each customers as c}
@@ -104,7 +82,11 @@
             <td class="customer-name" style="color: #FFFFFF !important;">{c.name}</td>
             <td style="color: #94A3B8 !important; font-size: 0.9rem; font-weight: 500;">{c.email||'—'}</td>
             <td style="color: #FB7185 !important; font-size: 0.9rem; font-weight: 500;">{c.address||'—'}</td>
-            <td style="color: #64748B !important; font-size: 0.9rem; font-weight: 600;">{c.birthdate||'—'}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; border-color: var(--red); color: var(--red-light);" onclick={() => window.location.href = `/admin/contracts?customerId=${c.id}`}>
+                Provision Line
+              </button>
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -141,19 +123,6 @@
         </button>
       </div>
     </form>
-  </Modal>
-
-  <Modal bind:show={showAdminModal} title="Provision Services" subtitle="Enter target MSISDN to trigger automated provisioning" type="admin">
-    <div class="form-group">
-      <label class="label">Target MSISDN</label>
-      <input class="input" bind:value={adminTargetMsisdn} placeholder="2010XXXXXXXX" />
-    </div>
-    <div style="display:flex;gap:1rem;justify-content:flex-end;margin-top:2rem">
-      <button type="button" class="btn btn-secondary" onclick={() => showAdminModal = false}>Cancel</button>
-      <button type="button" class="btn btn-primary" onclick={adminProvision} disabled={provisionLoading}>
-        {provisionLoading ? 'Running...' : 'Run Provisioning'}
-      </button>
-    </div>
   </Modal>
 
 

@@ -69,24 +69,33 @@
 
   // Formatter: Logic updated because API sends MB
   // Smart Formatter: Logic updated to handle legacy SMS records and dynamic usage
-  function formatUsage(value, type, destination) {
+  function formatUsage(value, serviceId, type, destination) {
+    if (value === 0 && (serviceId === 2 || String(destination).toLowerCase() === 'internet')) return '0 MB';
     if (value === 0) return '0';
     if (!value) return '—';
 
-    // Smart Correction for legacy records: If type is Data (2) but usage is 1 and destination is numeric, treat as SMS
-    const isLegacySMS = type === 'data' && value === 1 && destination && /^\d+$/.test(destination.replace(/[+]/g, ''));
-    const effectiveType = isLegacySMS ? 'sms' : type;
+    // Prioritize Raw Service ID: 1=Voice, 2=Data, 3=SMS
+    let effectiveType = 'other';
+    if (serviceId === 1) effectiveType = 'voice';
+    else if (serviceId === 2) effectiveType = 'data';
+    else if (serviceId === 3) effectiveType = 'sms';
+    else {
+      // Fallback to string analysis
+      const typeStr = String(type || '').toLowerCase();
+      const destStr = String(destination || '').toLowerCase();
+      if (typeStr.includes('voice') || typeStr.includes('call')) effectiveType = 'voice';
+      else if (typeStr.includes('data') || typeStr.includes('internet') || destStr === 'internet') effectiveType = 'data';
+      else if (typeStr.includes('sms')) effectiveType = 'sms';
+    }
 
     switch (effectiveType) {
       case 'voice':
-        const h = Math.floor(value / 3600);
-        const m = Math.floor((value % 3600) / 60);
-        const s = value % 60;
-        return `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
+        const mins = (value / 60).toFixed(1);
+        return `${mins} min`;
 
       case 'data':
         if (value >= 1024) return (value / 1024).toFixed(2) + ' GB';
-        return value.toFixed(2) + ' MB';
+        return value.toFixed(1) + ' MB';
 
       case 'sms':
         return value + ' SMS';
@@ -96,25 +105,22 @@
     }
   }
 
-  const getTypeInfo = (type, value, destination) => {
-    // If it's a legacy number ID
-    if (type === 1 || type === '1') return { label: 'Voice', class: 'badge-voice' };
-    if (type === 2 || type === '2') {
-      const isLegacySMS = value === 1 && destination && /^\d+$/.test(destination.replace(/[+]/g, ''));
-      return isLegacySMS ? { label: 'SMS', class: 'badge-sms' } : { label: 'Data', class: 'badge-data' };
-    }
-    if (type === 3 || type === '3') return { label: 'SMS', class: 'badge-sms' };
+  const getTypeInfo = (serviceId, ratedType, destination) => {
+    // Priority 1: Raw Service ID
+    if (serviceId === 1) return { label: 'Voice', class: 'badge-voice' };
+    if (serviceId === 2) return { label: 'Data', class: 'badge-data' };
+    if (serviceId === 3) return { label: 'SMS', class: 'badge-sms' };
 
-    // New Smart Rating String Labels
-    const typeStr = String(type || '').toLowerCase();
+    // Priority 2: Destination Analysis
+    if (String(destination).toLowerCase() === 'internet') return { label: 'Data', class: 'badge-data' };
+
+    // Fallback: Bundle analysis
+    const typeStr = String(ratedType || '').toLowerCase();
+    if (typeStr.includes('voice')) return { label: 'Voice', class: 'badge-voice' };
+    if (typeStr.includes('data')) return { label: 'Data', class: 'badge-data' };
+    if (typeStr.includes('sms')) return { label: 'SMS', class: 'badge-sms' };
     
-    if (typeStr.includes('voice')) return { label: type, class: 'badge-voice' };
-    if (typeStr.includes('data')) return { label: type, class: 'badge-data' };
-    if (typeStr.includes('sms')) return { label: type, class: 'badge-sms' };
-    if (typeStr.includes('bonus') || typeStr.includes('free')) return { label: type, class: 'badge-units' };
-    if (typeStr.includes('overage')) return { label: 'Overage', class: 'badge-error' };
-    
-    return { label: type || 'Other', class: 'badge-secondary' };
+    return { label: 'Service', class: 'badge-secondary' };
   };
 
   $effect(() => { loadCDRs(); });
@@ -172,16 +178,21 @@
             </thead>
             <tbody>
             {#each filteredCDRs as cdr}
-              {@const typeInfo = getTypeInfo(cdr.type, cdr.duration, cdr.destination)}
+              {@const typeInfo = getTypeInfo(cdr.service_id, cdr.type, cdr.destination)}
               <tr>
                 <td><span class="id-badge">#{cdr.id}</span></td>
                 <td><span class="phone-num">{cdr.msisdn}</span></td>
                 <td><span class="phone-num">{cdr.destination || '—'}</span></td>
-                <td><span class="usage-text">{formatUsage(cdr.duration, cdr.type, cdr.destination)}</span></td>
+                <td><span class="usage-text">{formatUsage(cdr.duration, cdr.service_id, cdr.type, cdr.destination)}</span></td>
                 <td>
-                    <span class="badge {typeInfo.class} badge-base">
-                      {typeInfo.label}
-                    </span>
+                    <div style="display:flex; flex-direction:column; gap:4px">
+                      <span class="badge {typeInfo.class} badge-base" style="width:fit-content">
+                        {typeInfo.label}
+                      </span>
+                      <span style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em">
+                        {cdr.type || 'System'}
+                      </span>
+                    </div>
                 </td>
                 <td class="text-muted">{new Date(cdr.timestamp).toLocaleString()}</td>
                 <td>

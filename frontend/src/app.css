@@ -41,6 +41,8 @@ body {
   overflow-x: hidden;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .app {
@@ -153,9 +155,12 @@ body {
 	transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 	overflow: hidden;
 	position: relative;
-	backface-visibility: hidden;
+	
+	/* Anti-Blur Fixes */
 	transform: translateZ(0);
-	will-change: backdrop-filter, transform;
+	backface-visibility: hidden;
+	-webkit-backface-visibility: hidden;
+	will-change: transform, backdrop-filter;
 	
 	/* Anti-Bleed Fix for Safari/Mobile */
 	-webkit-mask-image: -webkit-radial-gradient(white, black);
@@ -163,9 +168,9 @@ body {
 
 .card:hover {
 	background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%);
-	border-color: rgba(224, 8, 0, 0.4);
-	transform: translateY(-8px) scale(1.02);
-	box-shadow: 0 40px 80px rgba(0, 0, 0, 0.9), 0 0 30px rgba(224, 8, 0, 0.15);
+	border-color: rgba(255, 255, 255, 0.2);
+	transform: translateY(-8px) translateZ(0);
+	box-shadow: 0 40px 80px rgba(0, 0, 0, 0.9);
 }
 
 .card-static {
