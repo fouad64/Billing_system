@@ -43,6 +43,9 @@ public class Main {
         
         StandardContext ctx = (StandardContext) tomcat.addWebapp("", webappFile.getAbsolutePath());
         
+        // FIX: Ensure Tomcat can find classes for @WebServlet/@WebFilter scanning
+        ctx.setParentClassLoader(Main.class.getClassLoader());
+        
         // 3. Best Practice: RemoteIpValve for Nginx Reverse Proxy
         RemoteIpValve valve = new RemoteIpValve();
         valve.setRemoteIpHeader("X-Forwarded-For");
@@ -84,26 +87,6 @@ public class Main {
 
         System.out.println("Configuring app with docbase: " + webappFile.getAbsolutePath());
 
-        tomcat.getConnector(); // Initialize the connector
-        tomcat.start();
-
-        // 6. AUTOMATION: Start Billing Automation Worker
-        // This listens for DB events to generate invoices in the background.
-        new Thread(new com.billing.automation.BillAutomationWorker()).start();
-
-        // 4. PRODUCTION: Graceful Shutdown Hook
-        // Ensures the DB pool is closed and Tomcat stops cleanly.
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("SHUTDOWN: Stopping FMRZ Billing System...");
-            try {
-                com.billing.db.DB.closePool();
-                tomcat.stop();
-                System.out.println("SHUTDOWN: System stopped gracefully.");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }));
-
         // 5. OBSERVABILITY: Health Check Endpoint
         // Used by Railway/Podman to monitor if the app and DB are alive.
         Tomcat.addServlet(ctx, "HealthCheck", new jakarta.servlet.http.HttpServlet() {
@@ -123,6 +106,26 @@ public class Main {
         });
         ctx.addServletMappingDecoded("/health", "HealthCheck");
         ctx.addServletMappingDecoded("/health/*", "HealthCheck");
+
+        tomcat.getConnector(); // Initialize the connector
+        tomcat.start();
+
+        // 6. AUTOMATION: Start Billing Automation Worker
+        // This listens for DB events to generate invoices in the background.
+        new Thread(new com.billing.automation.BillAutomationWorker()).start();
+
+        // 4. PRODUCTION: Graceful Shutdown Hook
+        // Ensures the DB pool is closed and Tomcat stops cleanly.
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("SHUTDOWN: Stopping FMRZ Billing System...");
+            try {
+                com.billing.db.DB.closePool();
+                tomcat.stop();
+                System.out.println("SHUTDOWN: System stopped gracefully.");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }));
 
         System.out.println("FMRZ Billing System started on port " + webPort);
         System.out.println("Health Check: http://localhost:" + webPort + "/health");

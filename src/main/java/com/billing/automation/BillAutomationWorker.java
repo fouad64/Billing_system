@@ -38,25 +38,18 @@ public class BillAutomationWorker implements Runnable {
         // For LISTEN/NOTIFY, we should ideally use a dedicated non-pooled connection.
         // We'll fetch the credentials from the environment.
         // Use the same logic as DB.java for robustness
-        String url = System.getenv("DB_URL");
-        if (url == null || url.isEmpty()) url = System.getProperty("DB_URL");
-        
-        if (url != null && url.contains("-pooler")) {
-            url = url.replace("-pooler", "");
-            System.out.println("ℹ [Automation] Using direct connection (no-pooler) for LISTEN/NOTIFY.");
-        }
-        
-        String user = System.getenv("DB_USER");
-        if (user == null || user.isEmpty()) user = System.getProperty("DB_USER");
-        
-        String pass = System.getenv("DB_PASSWORD");
-        if (pass == null || pass.isEmpty()) pass = System.getProperty("DB_PASSWORD");
+        String url = getEnvOrProp("DB_URL", "db.url");
+        String user = getEnvOrProp("DB_USER", "db.user");
+        String pass = getEnvOrProp("DB_PASSWORD", "db.password");
 
         try (Connection conn = java.sql.DriverManager.getConnection(url, user, pass)) {
             // Unwrap PostgreSQL connection to access LISTEN/NOTIFY features
             PGConnection pgConn = conn.unwrap(PGConnection.class);
 
             try (Statement stmt = conn.createStatement()) {
+                // FIX: Set search_path for the direct connection
+                stmt.execute("SET search_path TO public, \"$user\";");
+                
                 stmt.execute("LISTEN generate_bill_event");
                 System.out.println("✔ [Automation] Listening for 'generate_bill_event' (Direct Connection)...");
             }
@@ -161,5 +154,35 @@ public class BillAutomationWorker implements Runnable {
             System.err.println("❌ [Automation] Jasper generation failed for Bill " + billId + ": " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private static String getEnvOrProp(String envKey, String propKey) {
+        // 1. Check Environment Variables
+        String val = System.getenv(envKey);
+        
+        // 2. Check System Properties (-DDB_URL=...)
+        if (val == null || val.trim().isEmpty()) {
+            val = System.getProperty(envKey);
+        }
+
+        // 3. Check db.properties fallback
+        if (val == null || val.trim().isEmpty() || val.contains("REPLACE_WITH_ENV_VAR")) {
+            // We'll try to load db.properties manually here for the worker
+            try (InputStream input = DB.class.getClassLoader().getResourceAsStream("db.properties")) {
+                if (input != null) {
+                    java.util.Properties props = new java.util.Properties();
+                    props.load(input);
+                    val = props.getProperty(propKey);
+                }
+            } catch (Exception ignored) {}
+        }
+        
+        // LISTEN/NOTIFY doesn't work through a pooler
+        if (val != null && val.contains("-pooler")) {
+            val = val.replace("-pooler", "");
+            System.out.println("ℹ [Automation] Stripping '-pooler' from URL for direct LISTEN/NOTIFY connection.");
+        }
+        
+        return val;
     }
 }

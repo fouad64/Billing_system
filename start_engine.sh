@@ -1,7 +1,23 @@
 #!/bin/bash
-(pkill -f "FINAL-SYNC-ENGINE.jar" || true)
-nohup java -DDB_URL=jdbc:postgresql://localhost:5432/billing_db \
-           -DDB_USER=zkhattab \
-           -DDB_PASSWORD=kh007 \
-           -jar FINAL-SYNC-ENGINE.jar > final_prod.log 2>&1 &
-echo "Engine started in background with PID $!"
+echo "Stopping existing billing system processes..."
+pkill -f "com.billing.Main" || true
+pkill -f "Telecom-Billing-Engine" || true
+
+# Aggressively kill anything on port 8080
+echo "Clearing port 8080..."
+fuser -k 8080/tcp || true
+
+echo "Cleaning environment..."
+unset DB_URL DB_USER DB_PASSWORD JAVA_OPTS
+
+echo "Loading environment variables from .env..."
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+else
+    echo "WARNING: .env file not found!"
+fi
+
+echo "Starting FMRZ Billing System..."
+mvn exec:java -Dexec.mainClass="com.billing.Main"
