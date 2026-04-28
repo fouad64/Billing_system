@@ -118,9 +118,14 @@ public class BillAutomationWorker implements Runnable {
             if (reportStream == null) {
                 throw new RuntimeException("Report template " + REPORT_TEMPLATE + " not found in classpath or filesystem!");
             }
-
-            // Compile on the fly (Integrated with USER's theme)
-            JasperReport jasperReport = JasperCompileManager.compileReport(reportStream);
+            
+            // JasperReports 7: Use JacksonUtil for strict schema validation
+            JasperReportsContext context = DefaultJasperReportsContext.getInstance();
+            net.sf.jasperreports.jackson.util.JacksonUtil jacksonUtil = net.sf.jasperreports.jackson.util.JacksonUtil.getInstance(context);
+            
+            // Load and compile
+            net.sf.jasperreports.engine.design.JasperDesign design = jacksonUtil.loadXml(reportStream, net.sf.jasperreports.engine.design.JasperDesign.class);
+            JasperReport jasperReport = JasperCompileManager.compileReport(design);
 
             // Set parameters
             Map<String, Object> params = new HashMap<>();

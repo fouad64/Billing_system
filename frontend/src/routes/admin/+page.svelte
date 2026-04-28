@@ -18,21 +18,32 @@
 
   async function fetchStats() {
     try {
-      const res = await fetch('/api/admin/stats');
+      const res = await fetch('/api/admin/stats', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        stats.customers = data.customers;
-        stats.contracts = data.contracts;
-        stats.active = data.active_contracts;
-        stats.suspended = data.suspended_contracts;
-        stats.suspended_debt = data.suspended_debt_contracts;
-        stats.terminated = data.terminated_contracts;
-        stats.cdrs = data.cdrs;
+        stats.customers = data.customers || 0;
+        stats.contracts = data.contracts || 0;
+        stats.active = data.active_contracts || 0;
+        stats.suspended = data.suspended_contracts || 0;
+        stats.suspended_debt = data.suspended_debt_contracts || 0;
+        stats.terminated = data.terminated_contracts || 0;
+        stats.cdrs = data.cdrs || 0;
       }
     } catch {}
   }
 
-  $effect(() => { load(); });
+  onMount(() => {
+    checkHealth();
+    fetchStats();
+    pollInterval = setInterval(() => {
+      checkHealth();
+      fetchStats();
+    }, 30000);
+  });
+
+  onDestroy(() => {
+    clearInterval(pollInterval);
+  });
 </script>
 
 <svelte:head><title>Admin Dashboard — FMRZ</title></svelte:head>

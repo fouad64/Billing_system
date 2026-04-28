@@ -1,17 +1,34 @@
-# Ignore everything by default
-**
+# --- Ignore Everything by Default ---
+**/*
 
-# Allow the Maven project file
-!pom.xml
-
-# Allow the source code (Java and Frontend)
-!src/**
-!frontend/**
-
-# Allow the configuration files
+# --- Allow only the necessary artifacts ---
+!target/Telecom-Billing-Engine.jar
 !.env
-!Dockerfile
-!docker-compose.yml
+!src/main/webapp/
+!input/
+!processed/
 
-# Allow build artifacts (if building locally)
+# --- Whitelist Master Demo Data ---
+!master_dummy_data.sql
+!massive_real_world_data.sql
+!create_missing_statements_demo.sql
+!whole_billing_updated.sql
+
+# --- Explicitly ignore all metadata and junk ---
+.git/
+.idea/
+.kilo/
+.m2/
+.settings/
+.mvn/
+node/
+node_dist/
+tomcat.*/
+scratch/
+backups/
+target/*
 !target/*.jar
+frontend/
+src/main/java/
+pom.xml
+mvnw*

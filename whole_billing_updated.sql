@@ -175,7 +175,7 @@ ALTER TABLE contract_consumption
 -- ------------------------------------------------------------
 CREATE TABLE invoice (
                          id               SERIAL PRIMARY KEY,
-                         bill_id          INTEGER NOT NULL REFERENCES bill(id),
+                         bill_id          INTEGER NOT NULL UNIQUE REFERENCES bill(id),
                          pdf_path         TEXT,
                          generation_date  TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -488,7 +488,6 @@ $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION rate_cdr(p_cdr_id INTEGER)
  RETURNS void
- LANGUAGE plpgsql
 AS $$
  DECLARE
      v_cdr RECORD;
@@ -625,7 +624,6 @@ $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION generate_bill(p_contract_id INTEGER, p_billing_period_start DATE)
     RETURNS INTEGER
-    LANGUAGE plpgsql
 AS $$
     DECLARE
         v_billing_period_end DATE;
@@ -658,11 +656,16 @@ AS $$
         FROM cdr c JOIN service_package sp ON c.service_id = sp.id
         WHERE c.dial_a = v_msisdn AND c.start_time >= p_billing_period_start AND c.start_time <= v_billing_period_end;
 
+        v_overage_charge := 0;
+        v_roaming_charge := 0;
         SELECT 
-            COALESCE(voice + data + sms, 0),
-            COALESCE(roaming_voice + roaming_data + roaming_sms, 0)
+            COALESCE(SUM(voice + data + sms), 0),
+            COALESCE(SUM(roaming_voice + roaming_data + roaming_sms), 0)
         INTO v_overage_charge, v_roaming_charge
         FROM ror_contract WHERE contract_id = p_contract_id AND bill_id IS NULL;
+        
+        v_overage_charge := COALESCE(v_overage_charge, 0);
+        v_roaming_charge := COALESCE(v_roaming_charge, 0);
 
         -- Calculate Promotional Savings (Regex for better matching)
         SELECT 
@@ -719,18 +722,20 @@ BEGIN
     PERFORM expire_addons();
 
     FOR v_contract IN
-        SELECT id FROM contract WHERE status = 'active'
-        LOOP
-            BEGIN
-                PERFORM generate_bill(v_contract.id, p_period_start);
-                v_success := v_success + 1;
-            EXCEPTION
-                WHEN OTHERS THEN
-                    RAISE WARNING 'generate_bill failed for contract %: %',
-                        v_contract.id, SQLERRM;
-                    v_failed := v_failed + 1;
-            END;
-        END LOOP;
+        SELECT id FROM contract 
+        WHERE status = 'active'
+          AND id NOT IN (SELECT contract_id FROM bill WHERE billing_period_start = p_period_start)
+    LOOP
+        BEGIN
+            PERFORM generate_bill(v_contract.id, p_period_start);
+            v_success := v_success + 1;
+        EXCEPTION
+            WHEN OTHERS THEN
+                RAISE WARNING 'generate_bill failed for contract %: %',
+                    v_contract.id, SQLERRM;
+                v_failed := v_failed + 1;
+        END;
+    END LOOP;
 
     RAISE NOTICE 'generate_all_bills complete: % succeeded, % failed',
         v_success, v_failed;
@@ -2220,22 +2225,22 @@ INSERT INTO bill (
     recurring_fees, one_time_fees, voice_usage, data_usage, sms_usage,
     ROR_charge, taxes, total_amount, status, is_paid
 ) VALUES
-    (1,  '2026-02-01', '2026-02-28', '2026-03-01', 50,  0.69, 280,    0,    38,  0,    5.07,  55.76,  'paid', TRUE),
-    (2,  '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 580,  1900,   72,  0,    12.07, 132.76, 'paid', TRUE),
-    (3,  '2026-02-01', '2026-02-28', '2026-03-01', 50,  0.69, 150,    0,    18,  0,    5.07,  55.76,  'paid', TRUE),
-    (4,  '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 410,  1400,   50,  0,    12.07, 132.76, 'paid', TRUE),
-    (5,  '2026-02-01', '2026-02-28', '2026-03-01', 50,  0.69, 80,     0,    10,  0,    5.07,  55.76,  'paid', TRUE),
-    (6,  '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 690,  2800,   95,  0,    12.07, 132.76, 'paid', TRUE),
-    (7,  '2026-02-01', '2026-02-28', '2026-03-01', 50,  0.69, 190,    0,    25,  0,    5.07,  55.76,  'paid', TRUE),
-    (8,  '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 350,  1200,   45,  0,    12.07, 132.76, 'paid', TRUE),
-    (9,  '2026-02-01', '2026-02-28', '2026-03-01', 50,  0.69, 120,    0,    15,  0,    5.07,  55.76,  'paid', TRUE),
-    (10, '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 470,  1750,   62,  0,    12.07, 132.76, 'paid', TRUE),
-    (11, '2026-02-01', '2026-02-28', '2026-03-01', 50,  0.69, 820,    0,   175, 10.0,  6.07,  66.76,  'paid', TRUE),
-    (12, '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 260,  800,    30,  0,    12.07, 132.76, 'paid', TRUE),
-    (14, '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 390, 1050,    52,  0,    12.07, 132.76, 'paid', TRUE),
-    (15, '2026-02-01', '2026-02-28', '2026-03-01', 349, 0.69, 750, 3500,   130,  0,    34.97, 384.66, 'paid', TRUE),
-    (16, '2026-02-01', '2026-02-28', '2026-03-01', 349, 0.69, 880, 4200,   160,  5.0,  35.47, 390.16, 'paid', TRUE),
-    (17, '2026-02-01', '2026-02-28', '2026-03-01', 120, 0.69, 310,  950,    42,  0,    12.07, 132.76, 'paid', TRUE);
+    (1,  '2026-02-01', '2026-02-28', '2026-03-01', 75,  0.69, 280,    0,    38,  0,    10.50,  86.19,  'paid', TRUE),
+    (2,  '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 580,  1900,   72,  0,    51.80, 422.49, 'paid', TRUE),
+    (3,  '2026-02-01', '2026-02-28', '2026-03-01', 75,  0.69, 150,    0,    18,  0,    10.50,  86.19,  'paid', TRUE),
+    (4,  '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 410,  1400,   50,  0,    51.80, 422.49, 'paid', TRUE),
+    (5,  '2026-02-01', '2026-02-28', '2026-03-01', 75,  0.69, 80,     0,    10,  0,    10.50,  86.19,  'paid', TRUE),
+    (6,  '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 690,  2800,   95,  0,    51.80, 422.49, 'paid', TRUE),
+    (7,  '2026-02-01', '2026-02-28', '2026-03-01', 75,  0.69, 190,    0,    25,  0,    10.50,  86.19,  'paid', TRUE),
+    (8,  '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 350,  1200,   45,  0,    51.80, 422.49, 'paid', TRUE),
+    (9,  '2026-02-01', '2026-02-28', '2026-03-01', 75,  0.69, 120,    0,    15,  0,    10.50,  86.19,  'paid', TRUE),
+    (10, '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 470,  1750,   62,  0,    51.80, 422.49, 'paid', TRUE),
+    (11, '2026-02-01', '2026-02-28', '2026-03-01', 75,  0.69, 820,    0,   175, 10.0,  6.07,  66.76,  'paid', TRUE),
+    (12, '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 260,  800,    30,  0,    51.80, 422.49, 'paid', TRUE),
+    (14, '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 390, 1050,    52,  0,    51.80, 422.49, 'paid', TRUE),
+    (15, '2026-02-01', '2026-02-28', '2026-03-01', 950, 0.69, 750, 3500,   130,  0,    133.00, 1083.69, 'paid', TRUE),
+    (16, '2026-02-01', '2026-02-28', '2026-03-01', 950, 0.69, 880, 4200,   160,  5.0,  35.47, 390.16, 'paid', TRUE),
+    (17, '2026-02-01', '2026-02-28', '2026-03-01', 370, 0.69, 310,  950,    42,  0,    51.80, 422.49, 'paid', TRUE);
 
 ------------------------------------------------------------
 -- BILLS (MARCH 2026) - mix of paid and issued
@@ -2245,22 +2250,22 @@ INSERT INTO bill (
     recurring_fees, one_time_fees, voice_usage, data_usage, sms_usage,
     ROR_charge, taxes, total_amount, status, is_paid
 ) VALUES
-    (1,  '2026-03-01', '2026-03-31', '2026-04-01', 50,  0.69, 310,    0,   42,  0,    5.07,  55.76,  'paid',   TRUE),
-    (2,  '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 640,  2200,  80,  0,    12.07, 132.76, 'paid',   TRUE),
-    (3,  '2026-03-01', '2026-03-31', '2026-04-01', 50,  0.69, 170,    0,   20,  0,    5.07,  55.76,  'issued', FALSE),
-    (4,  '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 450,  1600,  58,  0,    12.07, 132.76, 'issued', FALSE),
-    (5,  '2026-03-01', '2026-03-31', '2026-04-01', 50,  0.69, 90,     0,   11,  0,    5.07,  55.76,  'issued', FALSE),
-    (6,  '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 720,  3100, 105,  0,    12.07, 132.76, 'issued', FALSE),
-    (7,  '2026-03-01', '2026-03-31', '2026-04-01', 50,  0.69, 200,    0,   28,  0,    5.07,  55.76,  'issued', FALSE),
-    (8,  '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 380,  1350,  50,  0,    12.07, 132.76, 'issued', FALSE),
-    (9,  '2026-03-01', '2026-03-31', '2026-04-01', 50,  0.69, 130,    0,   16,  0,    5.07,  55.76,  'issued', FALSE),
-    (10, '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 500,  1900,  68,  0,    12.07, 132.76, 'issued', FALSE),
-    (11, '2026-03-01', '2026-03-31', '2026-04-01', 50,  0.69, 900,    0,  195, 14.5,  6.52,  71.71,  'issued', FALSE),
-    (12, '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 280,  850,   35,  0,    12.07, 132.76, 'issued', FALSE),
-    (14, '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 420, 1100,   55,  0,    12.07, 132.76, 'issued', FALSE),
-    (15, '2026-03-01', '2026-03-31', '2026-04-01', 349, 0.69, 800, 3700,  140,  0,    34.97, 384.66, 'issued', FALSE),
-    (16, '2026-03-01', '2026-03-31', '2026-04-01', 349, 0.69, 920, 4800,  170,  8.0,  35.77, 393.46, 'issued', FALSE),
-    (17, '2026-03-01', '2026-03-31', '2026-04-01', 120, 0.69, 330,  980,   45,  0,    12.07, 132.76, 'issued', FALSE);
+    (1,  '2026-03-01', '2026-03-31', '2026-04-01', 75,  0.69, 310,    0,   42,  0,    10.50,  86.19,  'paid',   TRUE),
+    (2,  '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 640,  2200,  80,  0,    51.80, 422.49, 'paid',   TRUE),
+    (3,  '2026-03-01', '2026-03-31', '2026-04-01', 75,  0.69, 170,    0,   20,  0,    10.50,  86.19,  'issued', FALSE),
+    (4,  '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 450,  1600,  58,  0,    51.80, 422.49, 'issued', FALSE),
+    (5,  '2026-03-01', '2026-03-31', '2026-04-01', 75,  0.69, 90,     0,   11,  0,    10.50,  86.19,  'issued', FALSE),
+    (6,  '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 720,  3100, 105,  0,    51.80, 422.49, 'issued', FALSE),
+    (7,  '2026-03-01', '2026-03-31', '2026-04-01', 75,  0.69, 200,    0,   28,  0,    10.50,  86.19,  'issued', FALSE),
+    (8,  '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 380,  1350,  50,  0,    51.80, 422.49, 'issued', FALSE),
+    (9,  '2026-03-01', '2026-03-31', '2026-04-01', 75,  0.69, 130,    0,   16,  0,    10.50,  86.19,  'issued', FALSE),
+    (10, '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 500,  1900,  68,  0,    51.80, 422.49, 'issued', FALSE),
+    (11, '2026-03-01', '2026-03-31', '2026-04-01', 75,  0.69, 900,    0,  195, 14.5,  6.52,  71.71,  'issued', FALSE),
+    (12, '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 280,  850,   35,  0,    51.80, 422.49, 'issued', FALSE),
+    (14, '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 420, 1100,   55,  0,    51.80, 422.49, 'issued', FALSE),
+    (15, '2026-03-01', '2026-03-31', '2026-04-01', 950, 0.69, 800, 3700,  140,  0,    133.00, 1083.69, 'issued', FALSE),
+    (16, '2026-03-01', '2026-03-31', '2026-04-01', 950, 0.69, 920, 4800,  170,  8.0,  35.77, 393.46, 'issued', FALSE),
+    (17, '2026-03-01', '2026-03-31', '2026-04-01', 370, 0.69, 330,  980,   45,  0,    51.80, 422.49, 'issued', FALSE);
 
 ------------------------------------------------------------
 -- INVOICES (February bills only - all paid)
@@ -2526,3 +2531,143 @@ CREATE TRIGGER trg_bill_inserted
 AFTER INSERT ON bill
 FOR EACH ROW
 EXECUTE FUNCTION notify_bill_generation();
+
+-- ------------------------------------------------------------
+-- GET BILL USAGE BREAKDOWN
+-- Returns detailed line items for a given bill, showing
+-- bundle consumption, overage, roaming, and promotional items.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_bill_usage_breakdown(p_bill_id INTEGER)
+RETURNS TABLE (
+    service_type      TEXT,
+    category_label    TEXT,
+    quota             INTEGER,
+    consumed          INTEGER,
+    unit_rate         NUMERIC(12,4),
+    line_total        NUMERIC(12,2),
+    is_roaming        BOOLEAN,
+    is_promotional    BOOLEAN,
+    notes             TEXT
+) AS $$
+DECLARE
+    v_contract_id INTEGER;
+    v_period_start DATE;
+BEGIN
+    -- Get contract and period for this bill
+    SELECT contract_id, billing_period_start INTO v_contract_id, v_period_start
+    FROM bill WHERE id = p_bill_id;
+    
+    -- 1. Bundled usage from contract_consumption (linked by bill_id)
+    RETURN QUERY
+    SELECT 
+        sp.type::TEXT AS service_type,
+        sp.name::TEXT AS category_label,
+        cc.quota_limit::INTEGER AS quota,
+        cc.consumed::INTEGER AS consumed,
+        0::NUMERIC(12,4) AS unit_rate,
+        0::NUMERIC(12,2) AS line_total,
+        sp.is_roaming,
+        (sp.name ~* 'Welcome|Gift|Bonus|Bonus') AS is_promotional,
+        CASE 
+            WHEN cc.consumed >= cc.quota_limit THEN 'Bundle fully utilized'::TEXT
+            ELSE 'Partial bundle usage'::TEXT
+        END AS notes
+    FROM contract_consumption cc
+    JOIN service_package sp ON cc.service_package_id = sp.id
+    WHERE cc.bill_id = p_bill_id
+      AND cc.is_billed = TRUE
+    
+    UNION ALL
+    
+    -- 2. Domestic overage (from ror_contract non-roaming columns)
+    SELECT 
+        'voice'::TEXT AS service_type,
+        'Domestic Overage - Voice'::TEXT AS category_label,
+        NULL::INTEGER AS quota,
+        NULL::INTEGER AS consumed,
+        rp.ror_voice AS unit_rate,
+        ROUND(rc.voice::NUMERIC, 2) AS line_total,
+        FALSE AS is_roaming,
+        FALSE AS is_promotional,
+        'Overage minutes beyond bundle allowance'::TEXT AS notes
+    FROM ror_contract rc
+    JOIN rateplan rp ON rc.rateplan_id = rp.id
+    WHERE rc.contract_id = v_contract_id
+      AND rc.bill_id = p_bill_id
+      AND rc.voice > 0
+    
+    UNION ALL
+    SELECT 
+        'data'::TEXT AS service_type,
+        'Domestic Overage - Data'::TEXT AS category_label,
+        NULL::INTEGER, NULL::INTEGER, rp.ror_data,
+        ROUND(rc.data::NUMERIC, 2), FALSE, FALSE,
+        'Overage data beyond bundle allowance'::TEXT
+    FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
+    WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.data > 0
+    
+    UNION ALL
+    SELECT 
+        'sms'::TEXT AS service_type,
+        'Domestic Overage - SMS'::TEXT AS category_label,
+        NULL::INTEGER, NULL::INTEGER, rp.ror_sms,
+        ROUND(rc.sms::NUMERIC, 2), FALSE, FALSE,
+        'Overage SMS beyond bundle allowance'::TEXT
+    FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
+    WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.sms > 0
+    
+    UNION ALL
+    
+    -- 3. Roaming charges (from ror_contract roaming columns)
+    SELECT 
+        'roaming_voice'::TEXT AS service_type,
+        'Roaming - Voice'::TEXT AS category_label,
+        NULL::INTEGER, NULL::INTEGER, rp.ror_voice,
+        ROUND(rc.roaming_voice::NUMERIC, 2), TRUE, FALSE,
+        'Voice usage while roaming'::TEXT
+    FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
+    WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.roaming_voice > 0
+    
+    UNION ALL
+    SELECT 
+        'roaming_data'::TEXT AS service_type,
+        'Roaming - Data'::TEXT AS category_label,
+        NULL::INTEGER, NULL::INTEGER, rp.ror_data,
+        ROUND(rc.roaming_data::NUMERIC, 2), TRUE, FALSE,
+        'Data usage while roaming'::TEXT
+    FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
+    WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.roaming_data > 0
+    
+    UNION ALL
+    SELECT 
+        'roaming_sms'::TEXT AS service_type,
+        'Roaming - SMS'::TEXT AS category_label,
+        NULL::INTEGER, NULL::INTEGER, rp.ror_sms,
+        ROUND(rc.roaming_sms::NUMERIC, 2), TRUE, FALSE,
+        'SMS usage while roaming'::TEXT
+    FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
+    WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.roaming_sms > 0
+    
+    UNION ALL
+    
+    -- 4. Promotional discounts (attributed to service packages with promotional names)
+    SELECT 
+        sp.type::TEXT AS service_type,
+        sp.name::TEXT AS category_label,
+        cc.quota_limit::INTEGER AS quota,
+        cc.consumed::INTEGER AS consumed,
+        0::NUMERIC(12,4) AS unit_rate,
+        0::NUMERIC(12,2) AS line_total,
+        sp.is_roaming,
+        TRUE AS is_promotional,
+        'Promotional rate applied'::TEXT AS notes
+    FROM contract_consumption cc
+    JOIN service_package sp ON cc.service_package_id = sp.id
+    WHERE cc.bill_id = p_bill_id
+      AND cc.is_billed = TRUE
+      AND sp.name ~* 'Welcome|Gift|Bonus'
+    
+    ORDER BY service_type, is_roaming DESC, category_label;
+END;
+$$ LANGUAGE plpgsql;
+INSERT INTO contract_consumption (contract_id, service_package_id, rateplan_id, starting_date, ending_date, consumed, quota_limit, is_billed, bill_id) VALUES (1, 1, 1, '2026-03-01', '2026-03-31', 310, 1000, true, 17), (1, 3, 1, '2026-03-01', '2026-03-31', 42, 100, true, 17);

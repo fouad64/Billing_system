@@ -67,9 +67,33 @@ The system is now "Hardened." This means it is no longer dependent on your local
 - **The Fix**: 
     1.  **Slim JRE**: Switched to `eclipse-temurin:21-jre-jammy` (saving 150MB).
     2.  **Non-Root User**: Created `javauser` to run the app, following the "Least Privilege" security principle.
-    3.  **Whitelisting**: Used a strict `.dockerignore` to only allow the Fat JAR and `.env` file into the build context.
+    3.  **Local-First Build**: Updated the `Dockerfile` to use local `target/` artifacts, bypassing container-specific network DNS issues during Node/Maven downloads.
 
 ## 🧩 11. Safety Net: Defensive Configuration
 - **Where**: `com.billing.db.DB.java`
 - **Why**: Missing environment variables in IntelliJ or Railway lead to cryptic "Driver not found" errors that waste developer time.
 - **The Fix**: Implemented **Placeholder Awareness**. The app now checks for the literal string `REPLACE_WITH_ENV_VAR`. If found, it stops immediately and prints a clean, human-readable "How-To Fix" guide in the console.
+
+## 📊 12. JasperReports 7 Automation: Jackson Schema Bug
+- **Where**: `BillAutomationWorker.java`
+- **Why**: JasperReports 7 changed how it parses XML templates. The traditional `JasperCompileManager` failed inside the containerized environment because it couldn't resolve the new XML schemas at runtime.
+- **The Fix**: Refactored the loading logic to use **`JacksonUtil.loadXml`**. This modern Jackson-based approach bypasses the old XML validation bottlenecks and successfully loads the `.jrxml` templates directly from the JAR.
+
+## 🌐 13. Container Networking: The Localhost Barrier
+- **Where**: `docker-compose.yml`
+- **Why**: Inside a container, `localhost` refers to the container itself, not your host computer. This meant the app couldn't find the PostgreSQL database running on your machine.
+- **The Fix**: Enabled **`network_mode: host`**. This allows the container to share the host's networking stack, giving it direct access to the database on `localhost:5432` without needing complicated bridge configurations.
+
+## ⚛️ 14. Frontend Logic: Missing State & Syntax
+- **Where**: `admin/contracts/+page.svelte`
+- **Why**: The "Provision New Line" feature had a searchable customer dropdown that was empty because the `filteredCustomers` variable was used in the template but never defined in the script. Additionally, invalid placement of `{@const}` tags caused build failures.
+- **The Fix**: 
+    1.  **Derived State**: Implemented Svelte 5 `$derived()` to calculate filtered search results in real-time.
+    2.  **Syntax Hardening**: Corrected the placement of `{@const}` tags to ensure they are immediate children of logic blocks, resolving the SvelteKit build crash.
+
+## 🧱 15. Billing Automation: Database Conflict Resolution
+- **Where**: `whole_billing_updated.sql` and `BillAutomationWorker.java`
+- **Why**: Automated bill generation was failing due to duplicate key violations when re-running a bill for the same period.
+- **The Fix**: 
+    1.  **Unique Constraint**: Added a `UNIQUE` constraint to `invoice.bill_id`.
+    2.  **Atomic Upsert**: Implemented `ON CONFLICT (bill_id) DO UPDATE` in the automation worker. This ensures that the billing cycle is idempotent—if you re-run it, the system updates the existing invoice instead of crashing.

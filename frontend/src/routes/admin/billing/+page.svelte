@@ -87,6 +87,7 @@
       if (res.ok) {
         showToast(`Bill #${billId} marked as paid.`);
         selectedIds.delete(billId);
+        selectedIds = new Set(selectedIds); // Trigger reactivity
         loadData();
       } else {
         showToast("Payment update failed.", 'error');
@@ -109,6 +110,7 @@
       if (res.ok) {
         showToast(`${selectedIds.size} bills marked as paid.`);
         selectedIds.clear();
+        selectedIds = new Set(selectedIds); // Trigger reactivity
         loadData();
       } else {
         showToast("Bulk payment failed.", 'error');

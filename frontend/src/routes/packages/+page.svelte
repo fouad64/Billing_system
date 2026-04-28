@@ -19,7 +19,17 @@
   
   // Logical separation for UI layout
   let welcomeGift = $derived(servicePkgs.find(p => p.name.toLowerCase().includes('gift')));
-  let addons = $derived(servicePkgs.filter(p => !p.name.toLowerCase().includes('gift')));
+  let addons = $derived(
+    servicePkgs
+      .filter(p => !p.name.toLowerCase().includes('gift'))
+      .sort((a, b) => {
+        // Sort by Roaming (Domestic first)
+        if (a.is_roaming !== b.is_roaming) return a.is_roaming ? 1 : -1;
+        // Sort by Type: Voice(1) -> Data(2) -> SMS(3)
+        const typeOrder = { 'voice': 1, 'data': 2, 'sms': 3 };
+        return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
+      })
+  );
   
   // Real-time search effect
   $effect(() => {
@@ -172,6 +182,8 @@
       {#if showDropdown && searchResults.length > 0}
         <div class="search-results card-glass">
           {#each searchResults as contract}
+            {@const pName = (contract.rateplanName || '').toLowerCase()}
+            {@const badgeClass = pName.includes('basic') ? 'badge-plan-basic' : pName.includes('premium') ? 'badge-plan-premium' : pName.includes('elite') ? 'badge-plan-elite' : pName.includes('standard') || pName.includes('gold') ? 'badge-plan-standard' : 'badge-customer'}
             <button 
               class="result-item" 
               onclick={() => {
@@ -180,11 +192,11 @@
                 showDropdown = false;
               }}
             >
-              <div style="display:flex; flex-direction:column">
-                <span class="res-num">{contract.msisdn}</span>
-                <span class="res-name">{contract.customerName}</span>
+              <div style="display:flex; flex-direction:column; gap: 2px;">
+                <span class="res-num" style="font-size: 1rem;">{contract.msisdn}</span>
+                <span class="res-name" style="font-size: 0.75rem; opacity: 0.7;">{contract.customerName}</span>
               </div>
-              <span class="badge badge-customer" style="font-size:0.6rem">{contract.rateplanName}</span>
+              <span class="badge {badgeClass}" style="font-size:0.55rem; padding: 2px 8px; height: fit-content; border-radius: 6px;">{contract.rateplanName}</span>
             </button>
           {/each}
         </div>
@@ -357,12 +369,12 @@
                 <span class="val">FREE</span>
                 <span class="sub">0 EGP</span>
               </div>
-              <button 
-                onclick={() => buyBundle(welcomeGift)}
-                class="btn btn-gift"
-              >
-                Claim My Gift
-              </button>
+               <button 
+                 onclick={() => buyBundle(welcomeGift)}
+                 class="btn btn-gift"
+               >
+                 {authState.user?.role === 'admin' ? 'Give to Customer' : 'Claim My Gift'}
+               </button>
             </div>
           </div>
         </div>
@@ -658,5 +670,30 @@
   .res-num { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #EF4444; }
   .res-name { font-size: 0.85rem; color: #94a3b8; }
   .selection-status { margin-top: 1rem; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 8px; color: #22C55E; font-size: 0.9rem; }
+
+  .badge-plan-basic { 
+    background: rgba(59, 130, 246, 0.1); 
+    color: #60a5fa; 
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-left: 3px solid #3b82f6;
+  }
+  .badge-plan-standard { 
+    background: rgba(255, 255, 255, 0.05); 
+    color: #cbd5e1; 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 3px solid #94a3b8;
+  }
+  .badge-plan-premium { 
+    background: rgba(248, 113, 113, 0.1); 
+    color: #fca5a5; 
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    border-left: 3px solid #f87171;
+  }
+  .badge-plan-elite { 
+    background: rgba(139, 92, 246, 0.1); 
+    color: #a78bfa; 
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-left: 3px solid #8b5cf6;
+  }
 
 </style>
