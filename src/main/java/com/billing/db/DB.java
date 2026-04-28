@@ -62,6 +62,10 @@ public class DB {
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
+            // FIX: Ensure 'public' schema is in the search path for every connection.
+            // This is required for Neon's pooler which defaults to an empty search path.
+            config.setConnectionInitSql("SET search_path TO public, \"$user\";");
+
             dataSource = new HikariDataSource(config);
         } catch (Exception e) {
             System.err.println("CRITICAL: Failed to initialize HikariCP Connection Pool");
@@ -150,6 +154,15 @@ public class DB {
                 ps.setObject(i + 1, params[i]);
             }
             return ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Helper to create a SQL Array for PostgreSQL.
+     */
+    public static java.sql.Array createSqlArray(String typeName, Object[] elements) throws SQLException {
+        try (Connection conn = getConnection()) {
+            return conn.createArrayOf(typeName, elements);
         }
     }
 
