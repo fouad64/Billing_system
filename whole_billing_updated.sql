@@ -2167,6 +2167,95 @@ EXCEPTION
 END;
 $$;
 
+--==========================================================
+--       Function for delete rate_plan 
+--
+--==========================================================
+
+
+
+CREATE OR REPLACE FUNCTION delete_rateplan(p_rateplan_id INTEGER) RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Check if rateplan is used by any active contracts
+    IF EXISTS (SELECT 1 FROM contract WHERE rateplan_id = p_rateplan_id) THEN
+        RAISE EXCEPTION 'Cannot delete rateplan: it is assigned to active contracts';
+    END IF;
+    
+    -- Delete service package associations first
+    DELETE FROM rateplan_service_package WHERE rateplan_id = p_rateplan_id;
+    
+    -- Delete the rateplan
+    DELETE FROM rateplan WHERE id = p_rateplan_id;
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Rateplan with id % not found', p_rateplan_id;
+    END IF;
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'delete_rateplan failed: %', SQLERRM;
+END;
+$$;
+--==========================================================
+--       Function for update rate_plan 
+--
+--==========================================================
+
+
+CREATE OR REPLACE FUNCTION update_rateplan(
+    p_rateplan_id INTEGER,
+    p_name VARCHAR(255) DEFAULT NULL,
+    p_ror_voice NUMERIC(10,2) DEFAULT NULL,
+    p_ror_data NUMERIC(10,2) DEFAULT NULL,
+    p_ror_sms NUMERIC(10,2) DEFAULT NULL,
+    p_price NUMERIC(10,2) DEFAULT NULL,
+    p_service_package_ids INTEGER[] DEFAULT NULL
+) RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_package_id INTEGER;
+BEGIN
+    -- Check if rateplan exists
+    IF NOT EXISTS (SELECT 1 FROM rateplan WHERE id = p_rateplan_id) THEN
+        RAISE EXCEPTION 'Rateplan with id % does not exist', p_rateplan_id;
+    END IF;
+    
+    -- Update rateplan fields (only non-null values)
+    UPDATE rateplan 
+    SET 
+        name = COALESCE(p_name, name),
+        ror_voice = COALESCE(p_ror_voice, ror_voice),
+        ror_data = COALESCE(p_ror_data, ror_data),
+        ror_sms = COALESCE(p_ror_sms, ror_sms),
+        price = COALESCE(p_price, price)
+    WHERE id = p_rateplan_id;
+    
+    -- Update service package associations if provided
+    IF p_service_package_ids IS NOT NULL THEN
+        -- Remove existing associations
+        DELETE FROM rateplan_service_package WHERE rateplan_id = p_rateplan_id;
+        
+        -- Add new associations
+        FOREACH v_package_id IN ARRAY p_service_package_ids
+        LOOP
+            IF NOT EXISTS (SELECT 1 FROM service_package WHERE id = v_package_id) THEN
+                RAISE EXCEPTION 'Service package with id % does not exist', v_package_id;
+            END IF;
+            
+            INSERT INTO rateplan_service_package (rateplan_id, service_package_id)
+            VALUES (p_rateplan_id, v_package_id);
+        END LOOP;
+    END IF;
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'update_rateplan failed: %', SQLERRM;
+END;
+$$;
+
 
 -- =========================================================
 -- DUMMY DATA
