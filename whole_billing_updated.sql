@@ -2125,6 +2125,49 @@ BEGIN
 END;
 $$;
 
+--==========================================================
+--       Function for adding new rate_plan 
+--
+--==========================================================
+CREATE OR REPLACE FUNCTION create_rateplan_with_packages(
+    p_name VARCHAR(255),
+    p_ror_voice NUMERIC(10,2),
+    p_ror_data NUMERIC(10,2), 
+    p_ror_sms NUMERIC(10,2),
+    p_price NUMERIC(10,2),
+    p_service_package_ids INTEGER[]
+) RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_rateplan_id INTEGER;
+    v_package_id INTEGER;
+BEGIN
+    -- Create the rateplan
+    INSERT INTO rateplan (name, ror_voice, ror_data, ror_sms, price)
+    VALUES (p_name, p_ror_voice, p_ror_data, p_ror_sms, p_price)
+    RETURNING id INTO v_rateplan_id;
+    
+    -- Link service packages to the rateplan
+    FOREACH v_package_id IN ARRAY p_service_package_ids
+    LOOP
+        IF NOT EXISTS (SELECT 1 FROM service_package WHERE id = v_package_id) THEN
+            RAISE EXCEPTION 'Service package with id % does not exist', v_package_id;
+        END IF;
+        
+        INSERT INTO rateplan_service_package (rateplan_id, service_package_id)
+        VALUES (v_rateplan_id, v_package_id);
+    END LOOP;
+    
+    RETURN v_rateplan_id;
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'create_rateplan_with_packages failed: %', SQLERRM;
+END;
+$$;
+
+
 -- =========================================================
 -- DUMMY DATA
 -- For testing and demonstration purposes
