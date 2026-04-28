@@ -241,94 +241,99 @@
               {plan.name}
             </button>
           {/each}
-          <div class="tab-pill" style="transform: translateX({activeIndex * 100}%);"></div>
+          <div class="tab-pill" style="width: {100 / (plans.length || 1)}%; transform: translateX({activeIndex * 100}%);"></div>
         </div>
 
         {#key activeIndex}
+          {@const activePlan = plans[activeIndex]}
+          {@const isElite = activePlan?.name?.toLowerCase().includes('elite') || activePlan?.price > 500}
+          {@const isBasic = activePlan?.name?.toLowerCase().includes('basic') || activePlan?.price < 100}
+          {@const glowColor = isElite ? 'rgba(139, 92, 246, 0.25)' : isBasic ? 'rgba(59, 130, 246, 0.25)' : 'rgba(224, 8, 0, 0.2)'}
+          
           <div 
             id="focus-card"
             class="focus-card card"
-            style="--glow-color: {plans[activeIndex]?.name.includes('Basic') ? 'rgba(0, 150, 255, 0.25)' : plans[activeIndex]?.name.includes('Elite') ? 'rgba(255, 165, 0, 0.25)' : 'rgba(224, 8, 0, 0.2)'};"
+            style="--glow-color: {glowColor};"
             onmousemove={(e) => handleMouseMove(e, 'focus-card')}
             in:fly={{ x: 50, duration: 800, opacity: 0 }}
           >
             <div class="glow-layer"></div>
             
             <div class="badge-container">
-              {#if activeIndex === 1}
-                <div class="plan-badge shimmer-pill popular">⭐ Most Popular</div>
-              {:else if plans[activeIndex]?.name.includes('Elite')}
+              {#if isElite}
                 <div class="plan-badge shimmer-pill elite-pill">⚡ Enterprise Grade</div>
+              {:else if activeIndex === 1 || activePlan?.name?.toLowerCase().includes('gold') || activePlan?.name?.toLowerCase().includes('premium')}
+                <div class="plan-badge shimmer-pill popular">⭐ Most Popular</div>
+              {:else if isBasic}
+                <div class="plan-badge shimmer-pill basic-pill">🌱 Essential</div>
               {:else}
-                <div class="badge-spacer"></div>
+                <div class="plan-badge shimmer-pill trend-pill">🔥 Best Value</div>
               {/if}
             </div>
 
             <div class="card-content-grid">
               <div class="card-visual-side">
                 <div class="plan-header">
-                  <h3>{plans[activeIndex]?.name}</h3>
+                  <h3>{activePlan?.name}</h3>
                   <div class="plan-price">
                     <span class="currency">EGP</span>
-                    <span class="amount">{plans[activeIndex]?.price}</span>
+                    <span class="amount">{activePlan?.price}</span>
                     <span class="period">/mo</span>
                   </div>
                 </div>
-                <button
-                  onclick={() => {
-                    if (!authState.user) window.location.href = '/register?plan=' + plans[activeIndex]?.id;
-                    else if (authState.user.role === 'admin') window.location.href = '/admin/contracts';
-                    else window.location.href = '/profile';
-                  }}
-                  class="btn btn-primary"
-                  style="width: 100%; margin-top: 2rem; position: relative; z-index: 2;"
-                >
-                  {#if !authState.initialized}
-                    Checking Status...
-                  {:else if !authState.user}
-                    Activate Now
-                  {:else if authState.user.role === 'admin'}
-                    Manage Contracts
-                  {:else}
-                    Back to Dashboard
-                  {/if}
-                </button>
+                
+                <div class="plan-actions" style="margin-top: 2.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                  <button
+                    onclick={() => {
+                      if (!authState.user) window.location.href = '/register?plan=' + activePlan?.id;
+                      else if (authState.user.role === 'admin') window.location.href = '/admin/contracts?plan=' + activePlan?.id;
+                      else window.location.href = '/onboarding?plan=' + activePlan?.id;
+                    }}
+                    class="btn btn-primary"
+                    style="width: 100%; position: relative; z-index: 2; padding: 1.25rem;"
+                  >
+                    {#if !authState.initialized}
+                      Checking Status...
+                    {:else if !authState.user}
+                      Get Started Now
+                    {:else if authState.user.role === 'admin'}
+                      Provision to Customer
+                    {:else}
+                      Switch to This Plan
+                    {/if}
+                  </button>
+                  
+                  <p class="tax-info">Prices exclude 14% VAT. Automatic monthly renewal.</p>
+                </div>
               </div>
 
               <div class="card-info-side">
                 <div class="plan-details">
                   <div class="detail-row">
                     <span class="detail-label">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="accent-icon"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.28-2.28a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="accent-icon"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.28-2.28a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                       Voice Rate
                     </span>
-                    <span class="detail-value">{plans[activeIndex]?.ror_voice} <small>EGP/min</small></span>
+                    <span class="detail-value">{activePlan?.ror_voice} <small>EGP/min</small></span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="accent-icon"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="accent-icon"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                       Data Rate
                     </span>
-                    <span class="detail-value">{plans[activeIndex]?.ror_data} <small>EGP/MB</small></span>
+                    <span class="detail-value">{activePlan?.ror_data} <small>EGP/MB</small></span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="accent-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="accent-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                       SMS Rate
                     </span>
-                    <span class="detail-value">{plans[activeIndex]?.ror_sms} <small>EGP/msg</small></span>
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="accent-icon"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                      Monthly Fee
-                    </span>
-                    <span class="detail-value">EGP {plans[activeIndex]?.price}</span>
+                    <span class="detail-value">{activePlan?.ror_sms} <small>EGP/msg</small></span>
                   </div>
                 </div>
                 <div class="description-container">
                   <p class="nebula-description">
-                    Optimized for {plans[activeIndex]?.name === 'Basic' ? 'daily essential use' : activeIndex === 1 ? 'maximum value and speed' : 'uncompromising elite performance'}.
+                    {activePlan?.name} plan provides {isElite ? 'uncompromised elite performance' : isBasic ? 'essential connectivity' : 'the perfect balance of value and speed'} for your digital needs.
                   </p>
                 </div>
               </div>
@@ -696,4 +701,7 @@
     border-left: 3px solid #8b5cf6;
   }
 
+  .basic-pill { border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1); }
+  .tax-info { font-size: 0.75rem; color: #64748b; text-align: center; margin-top: 0.5rem; opacity: 0.8; }
+  .tab-pill { transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s ease !important; }
 </style>
