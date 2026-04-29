@@ -83,4 +83,11 @@ public abstract class BaseServlet extends HttpServlet {
             return defaultValue;
         }
     }
+
+    protected boolean isAdmin(HttpServletRequest req) {
+        jakarta.servlet.http.HttpSession session = req.getSession(false);
+        if (session == null) return false;
+        Map<String, Object> user = (Map<String, Object>) session.getAttribute("user");
+        return user != null && "admin".equalsIgnoreCase((String) user.get("role"));
+    }
 }
