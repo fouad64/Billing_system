@@ -49,7 +49,7 @@ public class CustomerProfileServlet extends BaseServlet {
                     "FROM user_account " +
                     "WHERE id = ?", userId);
                 if (profile.isEmpty()) sendError(res, 404, "User not found");
-                else sendJson(res, profile.get(0));
+                else sendJson(res, profile.getFirst());
             } 
             else if ("/contracts".equals(path)) {
                 List<Map<String, Object>> list = DB.executeSelect(
@@ -87,7 +87,7 @@ public class CustomerProfileServlet extends BaseServlet {
                     return;
                 }
 
-                Map<String, Object> bill = bills.get(0);
+                Map<String, Object> bill = bills.getFirst();
 
                 // Generate PDF using official template and live DB connection
                 res.setContentType("application/pdf");

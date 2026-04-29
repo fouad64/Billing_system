@@ -15,10 +15,12 @@ public class AuthServlet extends BaseServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
         String path = req.getPathInfo();
-        if ("/login".equals(path)) handleLogin(req, res);
-        else if ("/register".equals(path)) handleRegister(req, res);
-        else if ("/logout".equals(path)) handleLogout(req, res);
-        else sendError(res, 404, "Not found");
+        switch (path) {
+            case "/login" -> handleLogin(req, res);
+            case "/register" -> handleRegister(req, res);
+            case "/logout" -> handleLogout(req, res);
+            default -> sendError(res, 404, "Not found");
+        }
     }
 
     @Override
@@ -32,9 +34,9 @@ public class AuthServlet extends BaseServlet {
     }
 
     private void handleLogin(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        Map body = readJson(req, Map.class);
-        String username = (String) body.get("username");
-        String password = (String) body.get("password");
+        Map<String, String> body = readJson(req, Map.class);
+        String username = body.get("username");
+        String password = body.get("password");
 
         try {
             List<Map<String, Object>> users = DB.executeSelect(
@@ -47,7 +49,7 @@ public class AuthServlet extends BaseServlet {
                 return;
             }
 
-            Map<String, Object> user = users.get(0);
+            Map<String, Object> user = users.getFirst();
             HttpSession session = req.getSession(true);
             session.setAttribute("user", user);
             sendJson(res, user);
@@ -58,13 +60,13 @@ public class AuthServlet extends BaseServlet {
     }
 
     private void handleRegister(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        Map body = readJson(req, Map.class);
-        String username  = (String) body.get("username");
-        String password  = (String) body.get("password");
-        String name      = (String) body.get("name");
-        String email     = (String) body.get("email");
-        String address   = (String) body.get("address");
-        String birthdate = (String) body.get("birthdate");
+        Map<String, String> body = readJson(req, Map.class);
+        String username  = body.get("username");
+        String password  = body.get("password");
+        String name      = body.get("name");
+        String email     = body.get("email");
+        String address   = body.get("address");
+        String birthdate = body.get("birthdate");
 
         try {
             List<Map<String, Object>> result = DB.executeSelect(
@@ -73,7 +75,7 @@ public class AuthServlet extends BaseServlet {
             );
 
             // ← get the real id back from DB, not from Java
-            int newId = ((Number) result.get(0).get("id")).intValue();
+            int newId = ((Number) result.getFirst().get("id")).intValue();
 
             System.out.println("[Register] New user id: " + newId);
 
@@ -87,7 +89,7 @@ public class AuthServlet extends BaseServlet {
                 return;
             }
 
-            Map<String, Object> user = users.get(0);
+            Map<String, Object> user = users.getFirst();
             System.out.println("[Register] Session user: " + user); // debug
 
             HttpSession session = req.getSession(true);
