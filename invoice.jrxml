@@ -64,8 +64,8 @@
 		<element kind="image" x="15" y="10" width="70" height="35" scaleImage="RetainShape" onErrorType="Blank">
 			<expression><![CDATA[$P{LOGO_PATH}]]></expression>
 		</element>
-		<element kind="staticText" x="15" y="48" width="220" height="12" forecolor="#808080" fontSize="8.0" >
-			<expression><![CDATA[$P{GROUP_NAME}]]></expression>
+		<element kind="textField" x="15" y="48" width="220" height="12" forecolor="#808080" fontSize="8.0">
+			<text><![CDATA[$P{GROUP_NAME}]]></text>
 		</element>
 		<element kind="staticText" x="380" y="4" width="160" height="30" forecolor="#FF0000" fontSize="22.0" bold="true" hTextAlign="Right">
 			<text><![CDATA[INVOICE]]></text>
