@@ -17,10 +17,13 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.billing.db.DB;
 
 public class CDRParser {
+    private static final Logger logger = LoggerFactory.getLogger(CDRParser.class);
     private static java.util.Map<String, Integer> serviceMap = new java.util.HashMap<>();
     private static java.util.Map<Integer, String> typeMap = new java.util.HashMap<>();
 
@@ -34,9 +37,9 @@ public class CDRParser {
                 serviceMap.put(name, id);
                 typeMap.put(id, type);
             }
-            System.out.println("[CONFIG] Loaded " + serviceMap.size() + " services from database.");
+            logger.info("Loaded {} services from database.", serviceMap.size());
         } catch (Exception e) {
-            System.err.println("[CONFIG] Failed to load services from database. Using safe defaults.");
+            logger.warn("Failed to load services from database. Using safe defaults.");
             serviceMap.put("Voice Pack", 1); typeMap.put(1, "voice");
             serviceMap.put("Data Pack", 2);  typeMap.put(2, "data");
             serviceMap.put("SMS Pack", 3);   typeMap.put(3, "sms");
@@ -59,7 +62,11 @@ public class CDRParser {
         File source = new File(sourceDir);
         File dest = new File(destDir);
 
-        if (!dest.exists()) dest.mkdirs();
+        if (!dest.exists()) {
+            if (!dest.mkdirs()) {
+                logger.warn("Failed to create destination directory: {}", destDir);
+            }
+        }
 
         File[] csvFiles = source.listFiles((dir, name) -> name.toLowerCase().endsWith(".csv"));
 
@@ -70,13 +77,12 @@ public class CDRParser {
 
         for (File file : csvFiles) {
             try {
-                System.out.println("Parsing CDR: " + file.getName());
+                logger.info("Parsing CDR: {}", file.getName());
                 parseAndInsert(file);
                 moveFile(file, dest);
-                System.out.println("Successfully processed: " + file.getName());
+                logger.info("Successfully processed: {}", file.getName());
             } catch (Exception e) {
-                System.err.println("Error processing " + file.getName() + ": " + e.getMessage());
-                e.printStackTrace();
+                logger.error("Error processing {}: {}", file.getName(), e.getMessage());
             }
         }
     }
@@ -93,7 +99,7 @@ public class CDRParser {
                 fileDateStr = yyyy + "-" + mm + "-" + dd;
             }
         } catch (Exception e) {
-            System.err.println("Warning: Could not parse date from filename " + fileName + ". Using fallback.");
+            logger.warn("Could not parse date from filename {}. Using fallback.", fileName);
         }
 
         Connection conn = DB.getConnection();
@@ -245,7 +251,7 @@ public class CDRParser {
         String finalName = uniqueId + "_" + originalName;
         Path target = destPath.toPath().resolve(finalName);
         
-        System.out.println("[AUDIT] Moving " + originalName + " to " + target.toAbsolutePath());
+        logger.info("Moving {} to {}", originalName, target.toAbsolutePath());
         try {
             Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {

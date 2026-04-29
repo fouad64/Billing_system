@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Database Connection Manager
@@ -15,13 +17,14 @@ import java.util.Properties;
  * ready to use, significantly reducing latency.
  */
 public class DB {
+    private static final Logger logger = LoggerFactory.getLogger(DB.class);
     private static final Properties props = new Properties();
     private static final HikariDataSource dataSource;
 
     static {
         try (InputStream input = DB.class.getClassLoader().getResourceAsStream("db.properties")) {
             if (input == null) {
-                System.err.println("WARNING: db.properties not found in classpath. Relying on Environment Variables.");
+                logger.warn("db.properties not found in classpath. Relying on Environment Variables.");
             } else {
                 props.load(input);
             }
@@ -35,15 +38,8 @@ public class DB {
             String pass = getEnvOrProp("DB_PASSWORD", "db.password");
 
             if (url == null || url.contains("REPLACE_WITH_ENV_VAR")) {
-                System.err.println("\n" + "=".repeat(60));
-                System.err.println("❌ CRITICAL: DATABASE CREDENTIALS MISSING");
-                System.err.println("=".repeat(60));
-                System.err.println("How to fix this:");
-                System.err.println("1. Locally (IntelliJ): Edit your 'Main' Run Configuration.");
-                System.err.println("   Add Environment Variables: DB_URL, DB_USER, DB_PASSWORD");
-                System.err.println("2. Cloud (Railway): Go to the 'Variables' tab and add them.");
-                System.err.println("=".repeat(60) + "\n");
-                throw new RuntimeException("Database URL is missing or placeholder. See logs above for help.");
+                logger.error("CRITICAL: DATABASE CREDENTIALS MISSING! DB_URL, DB_USER, and DB_PASSWORD must be set as environment variables.");
+                throw new RuntimeException("Database URL is missing or placeholder.");
             }
 
             config.setJdbcUrl(url);
@@ -64,8 +60,7 @@ public class DB {
 
             dataSource = new HikariDataSource(config);
         } catch (Exception e) {
-            System.err.println("CRITICAL: Failed to initialize HikariCP Connection Pool");
-            e.printStackTrace();
+            logger.error("CRITICAL: Failed to initialize HikariCP Connection Pool", e);
             throw new RuntimeException(e);
         }
     }
