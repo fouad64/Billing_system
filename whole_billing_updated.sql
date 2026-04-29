@@ -57,6 +57,9 @@ CREATE TABLE rateplan (
                           ror_data  NUMERIC(10,2),     -- e.g. 0.05
                           ror_voice NUMERIC(10,2),     -- e.g. 0.05
                           ror_sms   NUMERIC(10,2),     -- e.g. 0.05
+                          ror_roaming_data  NUMERIC(10,2),
+                          ror_roaming_voice NUMERIC(10,2),
+                          ror_roaming_sms   NUMERIC(10,2),
                           price     NUMERIC(10,2)      -- base price of the plan
 );
 
@@ -125,14 +128,15 @@ CREATE TABLE contract_consumption (
 CREATE TABLE ror_contract (
                               contract_id INTEGER NOT NULL REFERENCES contract(id),
                               rateplan_id INTEGER NOT NULL REFERENCES rateplan(id),
-                              data        INTEGER,
-                              voice       INTEGER,
-                              sms         INTEGER,
+                              starting_date DATE NOT NULL DEFAULT DATE_TRUNC('month', CURRENT_DATE)::DATE,
+                              data        BIGINT DEFAULT 0,
+                              voice       NUMERIC(12,2) DEFAULT 0,
+                              sms         BIGINT DEFAULT 0,
                               roaming_voice NUMERIC(12,2) DEFAULT 0.00,
-                              roaming_data NUMERIC(12,2) DEFAULT 0.00,
-                              roaming_sms  NUMERIC(12,2) DEFAULT 0.00,
-                              PRIMARY KEY (contract_id, rateplan_id)
-    -- bill_id added after bill table below (FK added via ALTER)
+                              roaming_data BIGINT DEFAULT 0,
+                              roaming_sms  BIGINT DEFAULT 0,
+                              bill_id      INTEGER,
+                              PRIMARY KEY (contract_id, rateplan_id, starting_date)
 );
 
 -- ------------------------------------------------------------
@@ -498,9 +502,13 @@ AS $$
      v_deduct NUMERIC;
      v_available NUMERIC;
      v_ror_rate NUMERIC;
+     v_ror_rate_v NUMERIC;
+     v_ror_rate_d NUMERIC;
+     v_ror_rate_s NUMERIC;
      v_overage_charge NUMERIC := 0;
      v_rated_service_id INTEGER;
      v_is_roaming BOOLEAN;
+     v_period_start DATE;
  BEGIN
      SELECT * INTO v_cdr FROM cdr WHERE id = p_cdr_id;
      
@@ -513,63 +521,84 @@ AS $$
      END IF;
 
      SELECT type::TEXT INTO v_service_type FROM service_package WHERE id = v_cdr.service_id;
-     v_remaining := v_cdr.duration;
-     v_is_roaming := (v_cdr.vplmn IS NOT NULL);
+     v_remaining := get_cdr_usage_amount(v_cdr.duration, v_service_type::service_type);
+     v_is_roaming := (v_cdr.vplmn IS NOT NULL AND v_cdr.vplmn != '');
 
-     FOR v_bundle IN 
-         SELECT cc.*, sp.name, sp.is_roaming as pkg_roaming
+     -- Determine billing period for this CDR
+     v_period_start := DATE_TRUNC('month', v_cdr.start_time)::DATE;
+
+     FOR v_bundle IN
+         SELECT cc.contract_id, cc.service_package_id, cc.rateplan_id, cc.consumed, cc.quota_limit, sp.name, sp.is_roaming as pkg_roaming
          FROM contract_consumption cc
          JOIN service_package sp ON cc.service_package_id = sp.id
          WHERE cc.contract_id = v_contract.id AND cc.is_billed = FALSE
+           AND cc.starting_date = v_period_start
            AND (sp.type::TEXT = v_service_type OR sp.type::TEXT = 'free_units')
-           AND sp.is_roaming = v_is_roaming
+           AND (sp.is_roaming = v_is_roaming OR sp.type::TEXT = 'free_units')
          ORDER BY sp.priority ASC
-     LOOP
-         EXIT WHEN v_remaining <= 0;
-         v_available := v_bundle.quota_limit - v_bundle.consumed;
-         IF v_available <= 0 THEN CONTINUE; END IF;
-         v_deduct := LEAST(v_remaining, v_available);
-         v_remaining := v_remaining - v_deduct;
-         
-         UPDATE contract_consumption 
-         SET consumed = consumed + v_deduct 
-         WHERE contract_id = v_bundle.contract_id 
-           AND service_package_id = v_bundle.service_package_id 
-           AND rateplan_id = v_bundle.rateplan_id 
-           AND starting_date = v_bundle.starting_date 
-           AND ending_date = v_bundle.ending_date;
-         v_rated_service_id := v_bundle.service_package_id;
-     END LOOP;
+       LOOP
+          EXIT WHEN v_remaining <= 0;
+          v_available := v_bundle.quota_limit - v_bundle.consumed;
+          IF v_available <= 0 THEN CONTINUE; END IF;
+          v_deduct := LEAST(v_remaining, v_available);
+          v_remaining := v_remaining - v_deduct;
 
-     IF v_remaining > 0 THEN
-         SELECT CASE v_service_type 
-            WHEN 'voice' THEN ror_voice WHEN 'data' THEN ror_data WHEN 'sms' THEN ror_sms 
-            END INTO v_ror_rate FROM rateplan WHERE id = v_contract.rateplan_id;
-         
-         v_overage_charge := v_remaining * COALESCE(v_ror_rate, 0);
+          UPDATE contract_consumption
+          SET consumed = consumed + v_deduct
+          WHERE contract_id = v_bundle.contract_id
+            AND service_package_id = v_bundle.service_package_id
+            AND rateplan_id = v_bundle.rateplan_id
+            AND starting_date = v_period_start;
+          v_rated_service_id := v_bundle.service_package_id;
+      END LOOP;
 
-         IF v_is_roaming THEN
-             INSERT INTO ror_contract (contract_id, rateplan_id, roaming_voice, roaming_data, roaming_sms)
-             VALUES (v_contract.id, v_contract.rateplan_id, 
-                    CASE WHEN v_service_type='voice' THEN v_overage_charge ELSE 0 END,
-                    CASE WHEN v_service_type='data'  THEN v_overage_charge ELSE 0 END,
-                    CASE WHEN v_service_type='sms'   THEN v_overage_charge ELSE 0 END)
-             ON CONFLICT (contract_id, rateplan_id) DO UPDATE SET
-                roaming_voice = ror_contract.roaming_voice + EXCLUDED.roaming_voice,
-                roaming_data = ror_contract.roaming_data + EXCLUDED.roaming_data,
-                roaming_sms = ror_contract.roaming_sms + EXCLUDED.roaming_sms;
-         ELSE
-             INSERT INTO ror_contract (contract_id, rateplan_id, voice, data, sms)
-             VALUES (v_contract.id, v_contract.rateplan_id, 
-                    CASE WHEN v_service_type='voice' THEN v_overage_charge ELSE 0 END,
-                    CASE WHEN v_service_type='data'  THEN v_overage_charge ELSE 0 END,
-                    CASE WHEN v_service_type='sms'   THEN v_overage_charge ELSE 0 END)
-             ON CONFLICT (contract_id, rateplan_id) DO UPDATE SET
-                voice = ror_contract.voice + EXCLUDED.voice,
-                data = ror_contract.data + EXCLUDED.data,
-                sms = ror_contract.sms + EXCLUDED.sms;
-         END IF;
-     END IF;
+      IF v_remaining > 0 THEN
+          IF v_is_roaming THEN
+              INSERT INTO ror_contract (contract_id, rateplan_id, starting_date, roaming_voice, roaming_data, roaming_sms)
+              VALUES (v_contract.id, v_contract.rateplan_id, v_period_start,
+                     CASE WHEN v_service_type='voice' THEN v_remaining ELSE 0 END,
+                     CASE WHEN v_service_type='data'  THEN v_remaining ELSE 0 END,
+                     CASE WHEN v_service_type='sms'   THEN v_remaining ELSE 0 END)
+              ON CONFLICT (contract_id, rateplan_id, starting_date) DO UPDATE SET
+                 roaming_voice = ror_contract.roaming_voice + EXCLUDED.roaming_voice,
+                 roaming_data = ror_contract.roaming_data + EXCLUDED.roaming_data,
+                 roaming_sms = ror_contract.roaming_sms + EXCLUDED.roaming_sms;
+          ELSE
+              INSERT INTO ror_contract (contract_id, rateplan_id, starting_date, voice, data, sms)
+              VALUES (v_contract.id, v_contract.rateplan_id, v_period_start,
+                     CASE WHEN v_service_type='voice' THEN v_remaining ELSE 0 END,
+                     CASE WHEN v_service_type='data'  THEN v_remaining ELSE 0 END,
+                     CASE WHEN v_service_type='sms'   THEN v_remaining ELSE 0 END)
+              ON CONFLICT (contract_id, rateplan_id, starting_date) DO UPDATE SET
+                 voice = ror_contract.voice + EXCLUDED.voice,
+                 data = ror_contract.data + EXCLUDED.data,
+                 sms = ror_contract.sms + EXCLUDED.sms;
+          END IF;
+
+          -- Calculate charge for the CDR record
+          SELECT 
+            CASE WHEN v_is_roaming THEN ror_roaming_voice ELSE ror_voice END as v_rate,
+            CASE WHEN v_is_roaming THEN ror_roaming_data ELSE ror_data END as d_rate,
+            CASE WHEN v_is_roaming THEN ror_roaming_sms ELSE ror_sms END as s_rate
+          INTO v_ror_rate_v, v_ror_rate_d, v_ror_rate_s
+          FROM rateplan WHERE id = v_contract.rateplan_id;
+
+          IF v_service_type = 'voice' THEN v_ror_rate := v_ror_rate_v;
+          ELSIF v_service_type = 'data' THEN v_ror_rate := v_ror_rate_d;
+          ELSIF v_service_type = 'sms' THEN v_ror_rate := v_ror_rate_s;
+          END IF;
+          
+          IF v_service_type = 'data' THEN
+              v_overage_charge := (v_remaining / 1073741824.0) * COALESCE(v_ror_rate, 0);
+          ELSE
+              v_overage_charge := v_remaining * COALESCE(v_ror_rate, 0);
+          END IF;
+
+          -- Deduct from available_credit
+          UPDATE contract 
+          SET available_credit = available_credit - v_overage_charge
+          WHERE id = v_contract.id;
+      END IF;
 
      UPDATE cdr SET rated_flag = TRUE, external_charges = v_overage_charge, rated_service_id = v_rated_service_id WHERE id = p_cdr_id;
  END;
@@ -648,43 +677,35 @@ AS $$
         SELECT rateplan_id, msisdn INTO v_rateplan_id, v_msisdn FROM contract WHERE id = p_contract_id;
         SELECT price, ror_voice, ror_data, ror_sms INTO v_recurring_fees, v_ror_rate_v, v_ror_rate_d, v_ror_rate_s FROM rateplan WHERE id = v_rateplan_id;
 
-        SELECT 
-            COALESCE(SUM(CASE WHEN sp.type::TEXT = 'voice' THEN c.duration ELSE 0 END), 0)::INT,
-            COALESCE(SUM(CASE WHEN sp.type::TEXT = 'data' THEN c.duration ELSE 0 END), 0)::INT,
-            COALESCE(SUM(CASE WHEN sp.type::TEXT = 'sms' THEN 1 ELSE 0 END), 0)::INT
+        -- Calculate actual usage from contract_consumption (normalized units)
+        SELECT
+            COALESCE(SUM(CASE WHEN sp.type::TEXT = 'voice' THEN cc.consumed ELSE 0 END), 0)::INT,
+            COALESCE(SUM(CASE WHEN sp.type::TEXT = 'data' THEN cc.consumed ELSE 0 END), 0)::INT,
+            COALESCE(SUM(CASE WHEN sp.type::TEXT = 'sms' THEN cc.consumed ELSE 0 END), 0)::INT
         INTO v_voice_usage, v_data_usage, v_sms_usage
-        FROM cdr c JOIN service_package sp ON c.service_id = sp.id
-        WHERE c.dial_a = v_msisdn AND c.start_time >= p_billing_period_start AND c.start_time <= v_billing_period_end;
+        FROM contract_consumption cc
+        JOIN service_package sp ON cc.service_package_id = sp.id
+        WHERE cc.contract_id = p_contract_id AND cc.starting_date = p_billing_period_start;
 
-        v_overage_charge := 0;
-        v_roaming_charge := 0;
-        SELECT 
-            COALESCE(SUM(voice + data + sms), 0),
-            COALESCE(SUM(roaming_voice + roaming_data + roaming_sms), 0)
+        -- Calculate overage charges from ror_contract (units * rates)
+        SELECT
+            COALESCE(SUM((voice * v_ror_rate_v) + (data / 1073741824.0 * v_ror_rate_d) + (sms * v_ror_rate_s)), 0),
+            COALESCE(SUM((roaming_voice * v_ror_rate_v) + (roaming_data / 1073741824.0 * v_ror_rate_d) + (roaming_sms * v_ror_rate_s)), 0)
         INTO v_overage_charge, v_roaming_charge
-        FROM ror_contract WHERE contract_id = p_contract_id AND bill_id IS NULL;
-        
+        FROM ror_contract 
+        WHERE contract_id = p_contract_id 
+          AND starting_date = p_billing_period_start
+          AND bill_id IS NULL;
+
         v_overage_charge := COALESCE(v_overage_charge, 0);
         v_roaming_charge := COALESCE(v_roaming_charge, 0);
 
-        -- Calculate Promotional Savings (Regex for better matching)
-        SELECT 
-            COALESCE(SUM(
-              CASE 
-                WHEN sp.type::TEXT = 'voice' THEN cc.consumed * v_ror_rate_v
-                WHEN sp.type::TEXT = 'data'  THEN cc.consumed * v_ror_rate_d
-                WHEN sp.type::TEXT = 'sms'   THEN cc.consumed * v_ror_rate_s
-                ELSE 0 
-              END), 0)
-        INTO v_promo_discount
-        FROM contract_consumption cc
-        JOIN service_package sp ON cc.service_package_id = sp.id
-        WHERE cc.contract_id = p_contract_id AND cc.starting_date = p_billing_period_start
-            AND (sp.name ~* 'Welcome|Gift|Bonus');
+        -- Calculate Promotional Savings (free units don't cost anything)
+        -- For now, set to 0 as promotional discounts should be calculated separately
+        v_promo_discount := 0;
 
-        -- Math Precision: Savings already reflected in overage (Overage is 0 if covered).
-        -- We don't double-subtract. We show it for transparency.
-        v_subtotal := (v_recurring_fees + COALESCE(v_overage_charge,0) + COALESCE(v_roaming_charge,0));
+        -- Calculate subtotal and taxes
+        v_subtotal := (v_recurring_fees + v_overage_charge + v_roaming_charge - v_promo_discount);
         v_taxes := 0.14 * v_subtotal;
         v_total_amount := v_subtotal + v_taxes;
 
@@ -698,9 +719,9 @@ AS $$
             v_overage_charge, v_roaming_charge, v_promo_discount, v_taxes, v_total_amount, 'issued'
         ) RETURNING id INTO v_bill_id;
 
-        UPDATE ror_contract SET bill_id = v_bill_id WHERE contract_id = p_contract_id AND bill_id IS NULL;
+        UPDATE ror_contract SET bill_id = v_bill_id WHERE contract_id = p_contract_id AND starting_date = p_billing_period_start AND bill_id IS NULL;
         UPDATE contract_consumption SET bill_id = v_bill_id, is_billed = TRUE WHERE contract_id = p_contract_id AND starting_date = p_billing_period_start;
-        
+
         RETURN v_bill_id;
     END;
 $$ LANGUAGE plpgsql;
@@ -742,36 +763,96 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
--- GET BILLS THAT ARE MISSING (contracts with no bill this period)
+-- BILLING AUDIT: Get Missing Bills
 -- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION get_missing_bills()
+DROP FUNCTION IF EXISTS get_missing_bills();
+DROP FUNCTION IF EXISTS get_missing_bills();
+CREATE OR REPLACE FUNCTION get_missing_bills(p_search TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 50, p_offset INTEGER DEFAULT 0)
     RETURNS TABLE (
                       contract_id    INTEGER,
                       msisdn         VARCHAR(20),
                       customer_name  VARCHAR(255),
-                      rateplan_name  VARCHAR(255)
+                      rateplan_name  VARCHAR(255),
+                      last_bill_date DATE,
+                      total_count    BIGINT
                   ) AS $$
 DECLARE
     v_period_start DATE := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+    v_total BIGINT;
 BEGIN
+    SELECT COUNT(*) INTO v_total
+    FROM contract c
+    JOIN user_account u ON c.user_account_id = u.id
+    LEFT JOIN rateplan r ON c.rateplan_id = r.id
+    WHERE c.status IN ('active', 'suspended', 'suspended_debt')
+      AND NOT EXISTS (
+        SELECT 1 FROM bill b
+        WHERE b.contract_id = c.id
+          AND b.billing_period_start = v_period_start
+      )
+      AND (p_search IS NULL OR p_search = '' OR
+           c.msisdn ILIKE '%' || p_search || '%' OR
+           u.name ILIKE '%' || p_search || '%' OR
+           r.name ILIKE '%' || p_search || '%');
+
     RETURN QUERY
         SELECT
             c.id           AS contract_id,
             c.msisdn,
             u.name         AS customer_name,
-            r.name         AS rateplan_name
+            r.name         AS rateplan_name,
+            (SELECT MAX(billing_date) FROM bill b WHERE b.contract_id = c.id) AS last_bill_date,
+            v_total AS total_count
         FROM contract c
                  JOIN user_account u ON c.user_account_id = u.id
                  LEFT JOIN rateplan r ON c.rateplan_id = r.id
-        WHERE c.status = 'active'
+        WHERE c.status IN ('active', 'suspended', 'suspended_debt')
           AND NOT EXISTS (
             SELECT 1 FROM bill b
             WHERE b.contract_id = c.id
               AND b.billing_period_start = v_period_start
-        )
-        ORDER BY c.id;
+          )
+          AND (p_search IS NULL OR p_search = '' OR
+               c.msisdn ILIKE '%' || p_search || '%' OR
+               u.name ILIKE '%' || p_search || '%' OR
+               r.name ILIKE '%' || p_search || '%')
+        ORDER BY c.id
+        LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ------------------------------------------------------------
+-- GENERATE BULK MISSING
+-- Generates bills for all contracts missing a bill for the current period
+-- that match the search criteria.
+-- ------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE generate_bulk_missing(p_search TEXT)
+    LANGUAGE plpgsql AS $$
+DECLARE
+    v_contract_id INTEGER;
+    v_period_start DATE := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+BEGIN
+    FOR v_contract_id IN
+        SELECT c.id
+        FROM contract c
+        JOIN user_account u ON c.user_account_id = u.id
+        LEFT JOIN rateplan r ON c.rateplan_id = r.id
+        WHERE c.status IN ('active', 'suspended', 'suspended_debt')
+          AND NOT EXISTS (
+            SELECT 1 FROM bill b
+            WHERE b.contract_id = c.id
+              AND b.billing_period_start = v_period_start
+          )
+          AND (p_search IS NULL OR p_search = '' OR
+               c.msisdn ILIKE '%' || p_search || '%' OR
+               u.name ILIKE '%' || p_search || '%' OR
+               r.name ILIKE '%' || p_search || '%')
+    LOOP
+        PERFORM generate_bill(v_contract_id, v_period_start);
+    END LOOP;
+END;
+$$;
+
 -- ------------------------------------------------------------
 -- CREATE CONTRACT
 -- Creates a new contract and immediately initializes
@@ -828,11 +909,12 @@ BEGIN
 
     INSERT INTO contract_consumption (
         contract_id, service_package_id, rateplan_id,
-        starting_date, ending_date, consumed, is_billed
+        starting_date, ending_date, consumed, quota_limit, is_billed
     )
     SELECT v_contract_id, rsp.service_package_id, p_rateplan_id,
-           v_period_start, v_period_end, 0, FALSE
+           v_period_start, v_period_end, 0, sp.amount, FALSE
     FROM rateplan_service_package rsp
+    JOIN service_package sp ON rsp.service_package_id = sp.id
     WHERE rsp.rateplan_id = p_rateplan_id
     ON CONFLICT DO NOTHING;
 
@@ -847,16 +929,29 @@ $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 -- GET ALL CONTRACTS
 -- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION get_all_contracts()
+DROP FUNCTION IF EXISTS get_all_contracts();
+CREATE OR REPLACE FUNCTION get_all_contracts(p_search TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 50, p_offset INTEGER DEFAULT 0)
     RETURNS TABLE (
                       id               INTEGER,
                       msisdn           VARCHAR(20),
                       status           contract_status,
                       available_credit NUMERIC(12,2),
                       customer_name    VARCHAR(255),
-                      rateplan_name    VARCHAR(255)
+                      rateplan_name    VARCHAR(255),
+                      total_count      BIGINT
                   ) AS $$
+DECLARE
+    v_total BIGINT;
 BEGIN
+    SELECT COUNT(*) INTO v_total
+    FROM contract c
+    JOIN user_account u ON c.user_account_id = u.id
+    LEFT JOIN rateplan r ON c.rateplan_id = r.id
+    WHERE (p_search IS NULL OR p_search = '' OR
+           c.msisdn ILIKE '%' || p_search || '%' OR
+           u.name ILIKE '%' || p_search || '%' OR
+           r.name ILIKE '%' || p_search || '%');
+
     RETURN QUERY
         SELECT
             c.id,
@@ -864,11 +959,17 @@ BEGIN
             c.status,
             c.available_credit,
             u.name  AS customer_name,
-            r.name  AS rateplan_name
+            r.name  AS rateplan_name,
+            v_total
         FROM contract c
                  JOIN user_account u ON c.user_account_id = u.id
                  LEFT JOIN rateplan r ON c.rateplan_id = r.id
-        ORDER BY c.id DESC;
+        WHERE (p_search IS NULL OR p_search = '' OR
+               c.msisdn ILIKE '%' || p_search || '%' OR
+               u.name ILIKE '%' || p_search || '%' OR
+               r.name ILIKE '%' || p_search || '%')
+        ORDER BY c.id DESC
+        LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -910,7 +1011,8 @@ $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 -- GET ALL CUSTOMERS
 -- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION get_all_customers()
+DROP FUNCTION IF EXISTS get_all_customers(TEXT);
+CREATE OR REPLACE FUNCTION get_all_customers(p_search TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 50, p_offset INTEGER DEFAULT 0)
     RETURNS TABLE (
                       id        INTEGER,
                       username    VARCHAR(255),
@@ -919,11 +1021,24 @@ CREATE OR REPLACE FUNCTION get_all_customers()
                       role      user_role,
                       address   TEXT,
                       birthdate DATE,
-                      msisdn    VARCHAR(20)
+                      msisdn    VARCHAR(20),
+                      total_count BIGINT
                   ) AS $$
+DECLARE
+    v_total BIGINT;
 BEGIN
+    SELECT COUNT(DISTINCT ua.id) INTO v_total
+    FROM user_account ua
+    LEFT JOIN contract c ON ua.id = c.user_account_id
+    WHERE ua.role = 'customer'
+      AND (p_search IS NULL OR p_search = '' OR
+           ua.name ILIKE '%' || p_search || '%' OR
+           ua.email ILIKE '%' || p_search || '%' OR
+           ua.username ILIKE '%' || p_search || '%' OR
+           c.msisdn ILIKE '%' || p_search || '%');
+
     RETURN QUERY
-        SELECT
+        SELECT DISTINCT ON (ua.id)
             ua.id,
             ua.username,
             ua.name,
@@ -931,11 +1046,18 @@ BEGIN
             ua.role,
             ua.address,
             ua.birthdate,
-            c.msisdn
+            c.msisdn,
+            v_total
         FROM user_account ua
         LEFT JOIN contract c ON ua.id = c.user_account_id
         WHERE ua.role = 'customer'
-        ORDER BY ua.id DESC;
+          AND (p_search IS NULL OR p_search = '' OR
+               ua.name ILIKE '%' || p_search || '%' OR
+               ua.email ILIKE '%' || p_search || '%' OR
+               ua.username ILIKE '%' || p_search || '%' OR
+               c.msisdn ILIKE '%' || p_search || '%')
+        ORDER BY ua.id DESC
+        LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -997,30 +1119,40 @@ $$ LANGUAGE plpgsql;
 -- ------------------------------------------------------------
 DROP FUNCTION IF EXISTS get_cdrs(INTEGER, INTEGER);
 CREATE OR REPLACE FUNCTION get_cdrs(p_limit INTEGER DEFAULT 50, p_offset INTEGER DEFAULT 0)
-    RETURNS TABLE (
-                      id          INTEGER,
-                      msisdn      VARCHAR(20),
-                      destination VARCHAR(20),
-                      duration    INTEGER,
-                      "timestamp"   TIMESTAMP,
-                      type        INTEGER,
-                      rated       BOOLEAN
-                  ) AS $$
-BEGIN
-    RETURN QUERY
-        SELECT
-            c.id,
-            c.dial_a   AS msisdn,
-            c.dial_b   AS destination,
-            c.duration,
-            c.start_time AS timestamp,
-            c.service_id AS type,
-            c.rated_flag AS rated
-        FROM cdr c
-        ORDER BY c.start_time DESC
-        LIMIT p_limit OFFSET p_offset;
-END;
-$$ LANGUAGE plpgsql;
+ RETURNS TABLE (
+     id INTEGER,
+     msisdn VARCHAR,
+     destination VARCHAR,
+     duration INTEGER,
+     "timestamp" TIMESTAMP,
+     rated BOOLEAN,
+     type VARCHAR,
+     service_id INTEGER,
+     service_type TEXT
+ ) AS $$
+ BEGIN
+     RETURN QUERY
+     SELECT 
+         c.id, 
+         c.dial_a AS msisdn, 
+         c.dial_b AS destination, 
+         c.duration, 
+         c.start_time AS "timestamp", 
+         c.rated_flag AS rated,
+         CASE 
+            WHEN sp_rated.id IS NOT NULL THEN sp_rated.name
+            WHEN c.external_charges > 0 THEN 'Overage (' || sp_base.name || ')'
+            ELSE COALESCE(sp_base.name, 'Unrated')
+         END AS type,
+         COALESCE(c.rated_service_id, c.service_id) AS service_id,
+         COALESCE(sp_rated.type::TEXT, sp_base.type::TEXT, 'other') AS service_type
+     FROM cdr c
+     LEFT JOIN service_package sp_rated ON c.rated_service_id = sp_rated.id
+     LEFT JOIN service_package sp_base ON c.service_id = sp_base.id
+     ORDER BY c.start_time DESC
+     LIMIT p_limit OFFSET p_offset;
+ END;
+ $$ LANGUAGE plpgsql;
 
 
 -- ------------------------------------------------------------
@@ -1293,6 +1425,67 @@ FROM contract_consumption
 WHERE contract_id = p_contract_id
   AND starting_date = p_period_start
   AND is_billed = FALSE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ------------------------------------------------------------
+-- GET ALL BILLS (PAGINATED)
+-- ------------------------------------------------------------
+DROP FUNCTION IF EXISTS get_all_bills(TEXT, INTEGER, INTEGER);
+CREATE OR REPLACE FUNCTION get_all_bills(p_search TEXT DEFAULT NULL, p_limit INTEGER DEFAULT 50, p_offset INTEGER DEFAULT 0)
+    RETURNS TABLE (
+                      id                   INTEGER,
+                      contract_id          INTEGER,
+                      billing_date         DATE,
+                      billing_period_start DATE,
+                      billing_period_end   DATE,
+                      total_amount         NUMERIC(12,2),
+                      is_paid              BOOLEAN,
+                      status               VARCHAR(20),
+                      voice_usage          INTEGER,
+                      data_usage           INTEGER,
+                      sms_usage            INTEGER,
+                      customer_name        VARCHAR(255),
+                      msisdn               VARCHAR(20),
+                      total_count          BIGINT
+                  ) AS $$
+DECLARE
+    v_total BIGINT;
+BEGIN
+    SELECT COUNT(*) INTO v_total
+    FROM bill b
+    JOIN contract c ON b.contract_id = c.id
+    JOIN user_account ua ON c.user_account_id = ua.id
+    WHERE (p_search IS NULL OR p_search = '' OR
+           ua.name ILIKE '%' || p_search || '%' OR
+           c.msisdn ILIKE '%' || p_search || '%' OR
+           b.status::TEXT ILIKE '%' || p_search || '%');
+
+    RETURN QUERY
+        SELECT
+            b.id,
+            b.contract_id,
+            b.billing_date,
+            b.billing_period_start,
+            b.billing_period_end,
+            b.total_amount,
+            b.is_paid,
+            b.status::VARCHAR(20) AS status,
+            b.voice_usage,
+            b.data_usage,
+            b.sms_usage,
+            ua.name AS customer_name,
+            c.msisdn,
+            v_total
+        FROM bill b
+        JOIN contract c ON b.contract_id = c.id
+        JOIN user_account ua ON c.user_account_id = ua.id
+        WHERE (p_search IS NULL OR p_search = '' OR
+               ua.name ILIKE '%' || p_search || '%' OR
+               c.msisdn ILIKE '%' || p_search || '%' OR
+               b.status::TEXT ILIKE '%' || p_search || '%')
+        ORDER BY b.billing_date DESC
+        LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -2017,26 +2210,26 @@ VALUES
 INSERT INTO user_account (name, address, birthdate, role, username, password, email)
 VALUES
     -- Admin
-    ('System Admin',   'HQ Cairo',        '1985-01-01', 'admin',    'admin',   'admin123',   'admin@fmrz.com'),
+    ('System Admin',   'HQ Cairo',        '1985-01-01', 'admin',    'admin',   '123456',   'admin@fmrz.com'),
     -- Customers
-    ('Alice Smith',    '123 Main St',      '1990-01-01', 'customer', 'alice',   'password1',  'alice@gmail.com'),
-    ('Bob Johnson',    '456 Elm St',       '1985-05-15', 'customer', 'bob',     'password2',  'bob@gmail.com'),
-    ('Carol White',    '789 Oak Ave',      '1992-03-10', 'customer', 'carol',   'password3',  'carol@gmail.com'),
-    ('David Brown',    '321 Pine Rd',      '1988-07-22', 'customer', 'david',   'password4',  'david@gmail.com'),
-    ('Eva Green',      '654 Maple Dr',     '1995-11-05', 'customer', 'eva',     'password5',  'eva@gmail.com'),
-    ('Frank Miller',   '987 Cedar Ln',     '1983-02-18', 'customer', 'frank',   'password6',  'frank@gmail.com'),
-    ('Grace Lee',      '147 Birch Blvd',   '1991-09-30', 'customer', 'grace',   'password7',  'grace@gmail.com'),
-    ('Henry Wilson',   '258 Walnut St',    '1987-04-14', 'customer', 'henry',   'password8',  'henry@gmail.com'),
-    ('Iris Taylor',    '369 Spruce Ave',   '1993-06-25', 'customer', 'iris',    'password9',  'iris@gmail.com'),
-    ('Jack Davis',     '741 Ash Ct',       '1986-12-03', 'customer', 'jack',    'password10', 'jack@gmail.com'),
-    ('Karen Martinez', '852 Elm Pl',       '1994-08-17', 'customer', 'karen',   'password11', 'karen@gmail.com'),
-    ('Leo Anderson',   '963 Oak St',       '1989-01-29', 'customer', 'leo',     'password12', 'leo@gmail.com'),
-    ('Mia Thomas',     '159 Pine Ave',     '1996-05-08', 'customer', 'mia',     'password13', 'mia@gmail.com'),
-    ('Noah Jackson',   '267 Maple Rd',     '1984-10-21', 'customer', 'noah',    'password14', 'noah@gmail.com'),
-    ('Olivia Harris',  '348 Cedar Dr',     '1997-03-15', 'customer', 'olivia',  'password15', 'olivia@gmail.com'),
-    ('Paul Clark',     '426 Birch Ln',     '1982-07-04', 'customer', 'paul',    'password16', 'paul@gmail.com'),
-    ('Quinn Lewis',    '537 Walnut Blvd',  '1998-11-19', 'customer', 'quinn',   'password17', 'quinn@gmail.com'),
-    ('Rachel Walker',  '648 Spruce St',    '1981-02-27', 'customer', 'rachel',  'password18', 'rachel@gmail.com');
+    ('Alice Smith',    '123 Main St',      '1990-01-01', 'customer', 'alice',   '123456',  'alice@gmail.com'),
+    ('Bob Johnson',    '456 Elm St',       '1985-05-15', 'customer', 'bob',     '123456',  'bob@gmail.com'),
+    ('Carol White',    '789 Oak Ave',      '1992-03-10', 'customer', 'carol',   '123456',  'carol@gmail.com'),
+    ('David Brown',    '321 Pine Rd',      '1988-07-22', 'customer', 'david',   '123456',  'david@gmail.com'),
+    ('Eva Green',      '654 Maple Dr',     '1995-11-05', 'customer', 'eva',     '123456',  'eva@gmail.com'),
+    ('Frank Miller',   '987 Cedar Ln',     '1983-02-18', 'customer', 'frank',   '123456',  'frank@gmail.com'),
+    ('Grace Lee',      '147 Birch Blvd',   '1991-09-30', 'customer', 'grace',   '123456',  'grace@gmail.com'),
+    ('Henry Wilson',   '258 Walnut St',    '1987-04-14', 'customer', 'henry',   '123456',  'henry@gmail.com'),
+    ('Iris Taylor',    '369 Spruce Ave',   '1993-06-25', 'customer', 'iris',    '123456',  'iris@gmail.com'),
+    ('Jack Davis',     '741 Ash Ct',       '1986-12-03', 'customer', 'jack',    '123456', 'jack@gmail.com'),
+    ('Karen Martinez', '852 Elm Pl',       '1994-08-17', 'customer', 'karen',   '123456', 'karen@gmail.com'),
+    ('Leo Anderson',   '963 Oak St',       '1989-01-29', 'customer', 'leo',     '123456', 'leo@gmail.com'),
+    ('Mia Thomas',     '159 Pine Ave',     '1996-05-08', 'customer', 'mia',     '123456', 'mia@gmail.com'),
+    ('Noah Jackson',   '267 Maple Rd',     '1984-10-21', 'customer', 'noah',    '123456', 'noah@gmail.com'),
+    ('Olivia Harris',  '348 Cedar Dr',     '1997-03-15', 'customer', 'olivia',  '123456', 'olivia@gmail.com'),
+    ('Paul Clark',     '426 Birch Ln',     '1982-07-04', 'customer', 'paul',    '123456', 'paul@gmail.com'),
+    ('Quinn Lewis',    '537 Walnut Blvd',  '1998-11-19', 'customer', 'quinn',   '123456', 'quinn@gmail.com'),
+    ('Rachel Walker',  '648 Spruce St',    '1981-02-27', 'customer', 'rachel',  '123456', 'rachel@gmail.com');
 
 ------------------------------------------------------------
 -- RATEPLANS
@@ -2582,11 +2775,11 @@ BEGIN
     -- 2. Domestic overage (from ror_contract non-roaming columns)
     SELECT 
         'voice'::TEXT AS service_type,
-        'Domestic Overage - Voice'::TEXT AS category_label,
+        'Overage - Voice'::TEXT AS category_label,
         NULL::INTEGER AS quota,
-        NULL::INTEGER AS consumed,
+        rc.voice::INTEGER AS consumed,
         rp.ror_voice AS unit_rate,
-        ROUND(rc.voice::NUMERIC, 2) AS line_total,
+        ROUND((rc.voice * rp.ror_voice)::NUMERIC, 2) AS line_total,
         FALSE AS is_roaming,
         FALSE AS is_promotional,
         'Overage minutes beyond bundle allowance'::TEXT AS notes
@@ -2599,75 +2792,64 @@ BEGIN
     UNION ALL
     SELECT 
         'data'::TEXT AS service_type,
-        'Domestic Overage - Data'::TEXT AS category_label,
-        NULL::INTEGER, NULL::INTEGER, rp.ror_data,
-        ROUND(rc.data::NUMERIC, 2), FALSE, FALSE,
+        'Overage - Data'::TEXT AS category_label,
+        NULL::INTEGER, 
+        (rc.data / 1024 / 1024)::INTEGER, -- Show as MB in consumed
+        rp.ror_data,
+        ROUND((rc.data / 1073741824.0 * rp.ror_data)::NUMERIC, 2), -- Convert Bytes to GB for pricing
+        FALSE, FALSE,
         'Overage data beyond bundle allowance'::TEXT
     FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
     WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.data > 0
     
     UNION ALL
+    -- 3. Roaming overage (from ror_contract roaming columns)
     SELECT 
-        'sms'::TEXT AS service_type,
-        'Domestic Overage - SMS'::TEXT AS category_label,
-        NULL::INTEGER, NULL::INTEGER, rp.ror_sms,
-        ROUND(rc.sms::NUMERIC, 2), FALSE, FALSE,
-        'Overage SMS beyond bundle allowance'::TEXT
-    FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
-    WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.sms > 0
-    
-    UNION ALL
-    
-    -- 3. Roaming charges (from ror_contract roaming columns)
-    SELECT 
-        'roaming_voice'::TEXT AS service_type,
-        'Roaming - Voice'::TEXT AS category_label,
-        NULL::INTEGER, NULL::INTEGER, rp.ror_voice,
-        ROUND(rc.roaming_voice::NUMERIC, 2), TRUE, FALSE,
-        'Voice usage while roaming'::TEXT
+        'voice'::TEXT AS service_type,
+        'Roaming Overage - Voice'::TEXT AS category_label,
+        NULL::INTEGER, rc.roaming_voice::INTEGER, rp.ror_roaming_voice,
+        ROUND((rc.roaming_voice * rp.ror_roaming_voice)::NUMERIC, 2),
+        TRUE, FALSE, 'Roaming overage minutes'::TEXT
     FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
     WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.roaming_voice > 0
     
     UNION ALL
     SELECT 
-        'roaming_data'::TEXT AS service_type,
-        'Roaming - Data'::TEXT AS category_label,
-        NULL::INTEGER, NULL::INTEGER, rp.ror_data,
-        ROUND(rc.roaming_data::NUMERIC, 2), TRUE, FALSE,
-        'Data usage while roaming'::TEXT
+        'data'::TEXT AS service_type,
+        'Roaming Overage - Data'::TEXT AS category_label,
+        NULL::INTEGER, (rc.roaming_data / 1024 / 1024)::INTEGER, rp.ror_roaming_data,
+        ROUND((rc.roaming_data / 1073741824.0 * rp.ror_roaming_data)::NUMERIC, 2),
+        TRUE, FALSE, 'Roaming overage data (MB)'::TEXT
     FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
     WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.roaming_data > 0
     
     UNION ALL
     SELECT 
-        'roaming_sms'::TEXT AS service_type,
-        'Roaming - SMS'::TEXT AS category_label,
-        NULL::INTEGER, NULL::INTEGER, rp.ror_sms,
-        ROUND(rc.roaming_sms::NUMERIC, 2), TRUE, FALSE,
-        'SMS usage while roaming'::TEXT
+        'sms'::TEXT AS service_type,
+        'Overage - SMS'::TEXT AS category_label,
+        NULL::INTEGER, rc.sms::INTEGER, rp.ror_sms,
+        ROUND((rc.sms * rp.ror_sms)::NUMERIC, 2), FALSE, FALSE,
+        'Overage SMS beyond bundle allowance'::TEXT
+    FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
+    WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.sms > 0
+
+    UNION ALL
+    SELECT 
+        'sms'::TEXT AS service_type,
+        'Roaming Overage - SMS'::TEXT AS category_label,
+        NULL::INTEGER, rc.roaming_sms::INTEGER, rp.ror_roaming_sms,
+        ROUND((rc.roaming_sms * rp.ror_roaming_sms)::NUMERIC, 2),
+        TRUE, FALSE, 'Roaming overage SMS'::TEXT
     FROM ror_contract rc JOIN rateplan rp ON rc.rateplan_id = rp.id
     WHERE rc.contract_id = v_contract_id AND rc.bill_id = p_bill_id AND rc.roaming_sms > 0
-    
-    UNION ALL
-    
-    -- 4. Promotional discounts (attributed to service packages with promotional names)
-    SELECT 
-        sp.type::TEXT AS service_type,
-        sp.name::TEXT AS category_label,
-        cc.quota_limit::INTEGER AS quota,
-        cc.consumed::INTEGER AS consumed,
-        0::NUMERIC(12,4) AS unit_rate,
-        0::NUMERIC(12,2) AS line_total,
-        sp.is_roaming,
-        TRUE AS is_promotional,
-        'Promotional rate applied'::TEXT AS notes
-    FROM contract_consumption cc
-    JOIN service_package sp ON cc.service_package_id = sp.id
-    WHERE cc.bill_id = p_bill_id
-      AND cc.is_billed = TRUE
-      AND sp.name ~* 'Welcome|Gift|Bonus'
     
     ORDER BY service_type, is_roaming DESC, category_label;
 END;
 $$ LANGUAGE plpgsql;
 INSERT INTO contract_consumption (contract_id, service_package_id, rateplan_id, starting_date, ending_date, consumed, quota_limit, is_billed, bill_id) VALUES (1, 1, 1, '2026-03-01', '2026-03-31', 310, 1000, true, 17), (1, 3, 1, '2026-03-01', '2026-03-31', 42, 100, true, 17);
+
+-- FINAL FIX: Sync all quota limits that were missed during bulk insertion
+UPDATE contract_consumption cc
+SET quota_limit = sp.amount
+FROM service_package sp
+WHERE cc.service_package_id = sp.id AND cc.quota_limit = 0;
