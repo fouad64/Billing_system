@@ -1,0 +1,10 @@
+HTTP/1.1 500 
+Content-Type: application/json;charset=UTF-8
+Content-Length: 268
+Date: Wed, 29 Apr 2026 20:21:06 GMT
+Connection: close
+
+{
+  "error": "Server Error: NoClassDefFoundError - Could not initialize class net.sf.jasperreports.extensions.ExtensionsEnvironment",
+  "message": "Server Error: NoClassDefFoundError - Could not initialize class net.sf.jasperreports.extensions.ExtensionsEnvironment"
+}

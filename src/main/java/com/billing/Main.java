@@ -3,6 +3,9 @@ package com.billing;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.WebResourceRoot;
 import org.apache.catalina.core.StandardContext;
+import net.sf.jasperreports.engine.DefaultJasperReportsContext;
+import net.sf.jasperreports.pdf.PdfExtensionsRegistryFactory;
+import net.sf.jasperreports.engine.JRPropertiesMap;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.valves.RemoteIpValve;
 import org.apache.catalina.webresources.DirResourceSet;
@@ -28,6 +31,16 @@ public class Main {
             System.out.println("✔ JasperReports 7 Environment Initialized");
         } catch (Exception e) {
             System.err.println("✘ JasperReports Initialization Warning: " + e.getMessage());
+        }
+
+        // Hard-register PDF extensions to bypass shading issues in Fat JAR
+        try {
+            DefaultJasperReportsContext context = DefaultJasperReportsContext.getInstance();
+            PdfExtensionsRegistryFactory pdfFactory = new PdfExtensionsRegistryFactory();
+            context.addExtensions(pdfFactory.createRegistry("pdf", new JRPropertiesMap()));
+            System.out.println("[Jasper] PDF Extensions manually registered.");
+        } catch (Exception e) {
+            System.err.println("[Jasper] Failed to manually register PDF extensions: " + e.getMessage());
         }
 
         Tomcat tomcat = new Tomcat();
