@@ -7,6 +7,9 @@ WORKDIR /app
 # 1. Create a non-root user for security
 RUN addgroup --system javauser && adduser --system --ingroup javauser javauser
 
+# 1.5 Install curl for healthchecks (Required for jammy-jre)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # 2. Copy local artifacts directly
 # (Requires that you've run the build locally first)
 COPY target/Telecom-Billing-Engine.jar app.jar
