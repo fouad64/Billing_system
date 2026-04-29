@@ -53,26 +53,12 @@ public class CDRParser {
     }
 
     private static void parseAndInsert(File file) throws IOException, SQLException {
-        // Extract date from filename: CDRYYYYMMDDHHMMSS.csv
         String fileName = file.getName();
-        String fileDateStr = "2024-01-01"; // Default fallback
-        try {
-            if (fileName.startsWith("CDR") && fileName.length() >= 11) {
-                String yyyy = fileName.substring(3, 7);
-                String mm = fileName.substring(7, 9);
-                String dd = fileName.substring(9, 11);
-                fileDateStr = yyyy + "-" + mm + "-" + dd;
-            }
-        } catch (Exception e) {
-            System.err.println("Warning: Could not parse date from filename " + fileName + ". Using fallback.");
-        }
-
         Connection conn = DB.getConnection();
         conn.setAutoCommit(false);
         Integer fileId = -1;
 
         try {
-            // Register file in database
             String createFile = "{ ? = call create_file_record(?) }";
             try (CallableStatement cs = conn.prepareCall(createFile)) {
                 cs.registerOutParameter(1, Types.INTEGER);
@@ -86,28 +72,58 @@ public class CDRParser {
                  BufferedReader br = new BufferedReader(new FileReader(file))) {
 
                 String line;
+                boolean isFirstLine = true;
                 while ((line = br.readLine()) != null) {
                     if (line.trim().isEmpty()) continue;
 
-                    // User Format: Dial A, Dial B, Service ID, Usage, Time, External charges
                     String[] p = line.split(",", -1);
-                    if (p.length < 6) continue;
 
-                    String dialA = p[0].trim();
-                    String dialB = p[1].trim();
+                    if (isFirstLine && p.length >= 2 && (p[0].trim().equalsIgnoreCase("file_id") || p[1].trim().equalsIgnoreCase("dial_a"))) {
+                        continue;
+                    }
+                    isFirstLine = false;
 
-                    // Normalize MSISDNs (Strip leading '00' to match database format)
-                    if (dialA.startsWith("00")) dialA = dialA.substring(2);
-                    if (dialB.startsWith("00")) dialB = dialB.substring(2);
-                    int serviceId = Integer.parseInt(p[2].trim());
-                    int usage = Integer.parseInt(p[3].trim());
-                    String timeStr = p[4].trim(); // HH:MM:SS
-                    double externalPiasters = Double.parseDouble(p[5].trim());
+                    String dialA, dialB;
+                    int usage, serviceId;
+                    double externalCharges;
+                    String hplmn = null, vplmn = null;
+                    Timestamp ts;
 
-                    // Construct full timestamp
-                    Timestamp ts = Timestamp.valueOf(fileDateStr + " " + timeStr);
+                    if (p.length >= 9 && p[3].trim().contains(" ")) {
+                        String fullTimestamp = p[3].trim();
+                        ts = Timestamp.valueOf(fullTimestamp);
+                        dialA = p[1].trim();
+                        dialB = p[2].trim();
+                        usage = Integer.parseInt(p[4].trim());
+                        serviceId = Integer.parseInt(p[5].trim());
+                        hplmn = p[6].trim().isEmpty() ? null : p[6].trim();
+                        vplmn = p[7].trim().isEmpty() ? null : p[7].trim();
+                        externalCharges = p.length > 8 ? Double.parseDouble(p[8].trim()) : 0;
+                    } else if (p.length >= 6) {
+                        String fileDateStr = "2024-01-01";
+                        try {
+                            if (fileName.startsWith("CDR") && fileName.length() >= 11) {
+                                String yyyy = fileName.substring(3, 7);
+                                String mm = fileName.substring(7, 9);
+                                String dd = fileName.substring(9, 11);
+                                fileDateStr = yyyy + "-" + mm + "-" + dd;
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Warning: Could not parse date from filename.");
+                        }
+                        dialA = p[0].trim();
+                        dialB = p[1].trim();
+                        if (dialA.startsWith("00")) dialA = dialA.substring(2);
+                        if (dialB.startsWith("00")) dialB = dialB.substring(2);
+                        serviceId = Integer.parseInt(p[2].trim());
+                        usage = Integer.parseInt(p[3].trim());
+                        String timeStr = p[4].trim();
+                        ts = Timestamp.valueOf(fileDateStr + " " + timeStr);
+                        externalCharges = p.length > 5 ? Double.parseDouble(p[5].trim()) : 0;
+                    } else {
+                        continue;
+                    }
 
-                    // Insert via SQL function (Match exact signature in whole_billing_updated.sql)
                     cs.registerOutParameter(1, Types.INTEGER);
                     cs.setInt(2, fileId);
                     cs.setString(3, dialA);
@@ -115,9 +131,9 @@ public class CDRParser {
                     cs.setTimestamp(5, ts);
                     cs.setInt(6, usage);
                     cs.setInt(7, serviceId);
-                    cs.setNull(8, Types.VARCHAR); // p_hplmn
-                    cs.setNull(9, Types.VARCHAR); // p_vplmn
-                    cs.setBigDecimal(10, BigDecimal.valueOf(externalPiasters / 100.0)); // p_external_charges
+                    if (hplmn != null) cs.setString(8, hplmn); else cs.setNull(8, Types.VARCHAR);
+                    if (vplmn != null) cs.setString(9, vplmn); else cs.setNull(9, Types.VARCHAR);
+                    cs.setBigDecimal(10, BigDecimal.valueOf(externalCharges / 100.0));
 
                     cs.execute();
                 }

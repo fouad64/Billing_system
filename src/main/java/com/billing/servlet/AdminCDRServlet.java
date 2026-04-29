@@ -26,7 +26,11 @@ public class AdminCDRServlet extends BaseServlet {
     // FIXED PROJECT ROOT
     // -----------------------------
     private static final String PROJECT_ROOT =
-            "/home/mohamed/IdeaProjects/Billing_System";
+            System.getenv("APP_ROOT") != null
+                ? System.getenv("APP_ROOT")
+                : System.getProperty("catalina.base") != null
+                    ? System.getProperty("catalina.base") + "/webapps/ROOT"
+                    : ".";
 
     private File ensureDir(String subfolder) {
         File dir = new File(PROJECT_ROOT, subfolder);
