@@ -98,11 +98,13 @@ public class CustomerProfileServlet extends BaseServlet {
                     Map<String, Object> params = new HashMap<>();
                     params.put("BILL_ID", billId);
                     
-                    // Restored logo using stable PNG format to avoid Batik conflicts
-                    try (InputStream logoStream = com.billing.util.JasperLoader.getResourceStream("red-logo.png")) {
+                    // Restored logo with enhanced logging
+                    InputStream logoStream = com.billing.util.JasperLoader.getResourceStream("red-logo.png");
+                    if (logoStream != null) {
                         params.put("LOGO_PATH", logoStream);
-                    } catch (Exception e) {
-                        logger.warn("Could not load logo: {}", e.getMessage());
+                        logger.info("✔ Logo 'red-logo.png' loaded successfully");
+                    } else {
+                        logger.warn("✘ Logo 'red-logo.png' NOT found in classpath");
                     }
                     
                     // --- HARDENING: Inject Company Info as Parameters (Loaded from config.properties) ---
