@@ -64,16 +64,16 @@
 		<element kind="image" x="15" y="10" width="70" height="35" scaleImage="RetainShape" onErrorType="Blank">
 			<expression><![CDATA[$P{LOGO_PATH}]]></expression>
 		</element>
-		<element kind="staticText" x="15" y="48" width="220" height="12" forecolor="#808080" fontSize="8.0" blankWhenNull="true">
+		<element kind="staticText" x="15" y="48" width="220" height="12" forecolor="#808080" fontSize="8.0" >
 			<expression><![CDATA[$P{GROUP_NAME}]]></expression>
 		</element>
 		<element kind="staticText" x="380" y="4" width="160" height="30" forecolor="#FF0000" fontSize="22.0" bold="true" hTextAlign="Right">
 			<text><![CDATA[INVOICE]]></text>
 		</element>
-		<element kind="textField" x="380" y="34" width="160" height="14" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+		<element kind="textField" x="380" y="34" width="160" height="14" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" >
 			<expression><![CDATA["#INV-" + String.format("%04d", $P{BILL_ID})]]></expression>
 		</element>
-		<element kind="textField" x="380" y="48" width="160" height="12" forecolor="#808080" fontSize="8.0" hTextAlign="Right" blankWhenNull="true">
+		<element kind="textField" x="380" y="48" width="160" height="12" forecolor="#808080" fontSize="8.0" hTextAlign="Right" >
 			<expression><![CDATA["Issued: " + new java.text.SimpleDateFormat("dd MMM yyyy").format($F{billing_date})]]></expression>
 		</element>
 	</title>
@@ -87,13 +87,13 @@
 			<element kind="staticText" x="18" y="10" width="155" height="12" forecolor="#FF0000" fontSize="9.0" bold="true">
 				<text><![CDATA[CUSTOMER]]></text>
 			</element>
-			<element kind="textField" x="18" y="22" width="155" height="11" forecolor="#FFFFFF" fontSize="8.0" blankWhenNull="true">
+			<element kind="textField" x="18" y="22" width="155" height="11" forecolor="#FFFFFF" fontSize="8.0" >
 				<expression><![CDATA[$F{customer_name}]]></expression>
 			</element>
-			<element kind="textField" x="18" y="34" width="155" height="10" forecolor="#808080" fontSize="7.0" blankWhenNull="true">
+			<element kind="textField" x="18" y="34" width="155" height="10" forecolor="#808080" fontSize="7.0" >
 				<expression><![CDATA[$F{msisdn} + " | " + $F{customer_email}]]></expression>
 			</element>
-			<element kind="textField" x="18" y="44" width="155" height="10" forecolor="#606060" fontSize="6.0" blankWhenNull="true">
+			<element kind="textField" x="18" y="44" width="155" height="10" forecolor="#606060" fontSize="6.0" >
 				<expression><![CDATA[$F{customer_address}]]></expression>
 			</element>
 
@@ -104,10 +104,10 @@
 			<element kind="staticText" x="198" y="10" width="155" height="12" forecolor="#FF0000" fontSize="9.0" bold="true">
 				<text><![CDATA[PROFILE]]></text>
 			</element>
-			<element kind="textField" x="198" y="22" width="155" height="11" forecolor="#FFFFFF" fontSize="8.0" blankWhenNull="true">
+			<element kind="textField" x="198" y="22" width="155" height="11" forecolor="#FFFFFF" fontSize="8.0" >
 				<expression><![CDATA[$F{rateplan_name}]]></expression>
 			</element>
-			<element kind="textField" x="198" y="34" width="155" height="10" forecolor="#808080" fontSize="7.0" blankWhenNull="true">
+			<element kind="textField" x="198" y="34" width="155" height="10" forecolor="#808080" fontSize="7.0" >
 				<expression><![CDATA[new java.text.SimpleDateFormat("dd/MM/yy").format($F{billing_period_start}) + " - " + new java.text.SimpleDateFormat("dd/MM/yy").format($F{billing_period_end})]]></expression>
 			</element>
 
@@ -118,7 +118,7 @@
 			<element kind="staticText" x="378" y="10" width="160" height="12" forecolor="#808080" fontSize="8.0" hTextAlign="Center">
 				<text><![CDATA[STATUS]]></text>
 			</element>
-			<element kind="textField" x="378" y="22" width="160" height="26" forecolor="#FF0000" fontSize="16.0" bold="true" hTextAlign="Center" blankWhenNull="true">
+			<element kind="textField" x="378" y="22" width="160" height="26" forecolor="#FF0000" fontSize="16.0" bold="true" hTextAlign="Center" >
 				<expression><![CDATA[$F{bill_status}.toUpperCase()]]></expression>
 			</element>
 
@@ -129,7 +129,7 @@
 			<element kind="staticText" x="15" y="66" width="78" height="10" forecolor="#808080" fontSize="7.0" hTextAlign="Center">
 				<text><![CDATA[VOICE]]></text>
 			</element>
-			<element kind="textField" x="15" y="78" width="78" height="32" forecolor="#FFFFFF" fontSize="22.0" bold="true" hTextAlign="Center" blankWhenNull="true">
+			<element kind="textField" x="15" y="78" width="78" height="32" forecolor="#FFFFFF" fontSize="22.0" bold="true" hTextAlign="Center" >
 				<expression><![CDATA[$F{voice_usage}]]></expression>
 			</element>
 			<element kind="staticText" x="15" y="108" width="78" height="8" forecolor="#606060" fontSize="6.0" hTextAlign="Center">
@@ -142,7 +142,7 @@
 			<element kind="staticText" x="107" y="66" width="78" height="10" forecolor="#808080" fontSize="7.0" hTextAlign="Center">
 				<text><![CDATA[DATA]]></text>
 			</element>
-			<element kind="textField" x="107" y="78" width="78" height="32" forecolor="#FFFFFF" fontSize="22.0" bold="true" hTextAlign="Center" blankWhenNull="true">
+			<element kind="textField" x="107" y="78" width="78" height="32" forecolor="#FFFFFF" fontSize="22.0" bold="true" hTextAlign="Center" >
 				<expression><![CDATA[$F{data_usage}]]></expression>
 			</element>
 			<element kind="staticText" x="107" y="108" width="78" height="8" forecolor="#606060" fontSize="6.0" hTextAlign="Center">
@@ -155,7 +155,7 @@
 			<element kind="staticText" x="199" y="66" width="78" height="10" forecolor="#808080" fontSize="7.0" hTextAlign="Center">
 				<text><![CDATA[SMS]]></text>
 			</element>
-			<element kind="textField" x="199" y="78" width="78" height="32" forecolor="#FFFFFF" fontSize="22.0" bold="true" hTextAlign="Center" blankWhenNull="true">
+			<element kind="textField" x="199" y="78" width="78" height="32" forecolor="#FFFFFF" fontSize="22.0" bold="true" hTextAlign="Center" >
 				<expression><![CDATA[$F{sms_usage}]]></expression>
 			</element>
 			<element kind="staticText" x="199" y="108" width="78" height="8" forecolor="#606060" fontSize="6.0" hTextAlign="Center">
@@ -169,10 +169,10 @@
 			<element kind="staticText" x="294" y="66" width="244" height="10" forecolor="#808080" fontSize="7.0">
 				<text><![CDATA[OVERAGE]]></text>
 			</element>
-			<element kind="textField" x="294" y="78" width="80" height="24" forecolor="#FF4444" fontSize="14.0" bold="true" blankWhenNull="true">
+			<element kind="textField" x="294" y="78" width="80" height="24" forecolor="#FF4444" fontSize="14.0" bold="true" >
 				<expression><![CDATA[($F{overage_charge} != null ? $F{overage_charge} : 0) + " EGP"]]></expression>
 			</element>
-			<element kind="textField" x="380" y="78" width="80" height="24" forecolor="#FFAA00" fontSize="14.0" bold="true" blankWhenNull="true">
+			<element kind="textField" x="380" y="78" width="80" height="24" forecolor="#FFAA00" fontSize="14.0" bold="true" >
 				<expression><![CDATA[($F{roaming_charge} != null ? $F{roaming_charge} : 0) + " EGP"]]></expression>
 			</element>
 			<element kind="staticText" x="294" y="100" width="80" height="10" forecolor="#606060" fontSize="6.0" hTextAlign="Center">
@@ -208,7 +208,7 @@
 			<element kind="staticText" x="20" y="161" width="260" height="12" forecolor="#E0E0E0" fontSize="8.0">
 				<text><![CDATA[Monthly Subscription (Plan)]]></text>
 			</element>
-			<element kind="textField" x="420" y="161" width="115" height="12" forecolor="#FFFFFF" fontSize="8.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="161" width="115" height="12" forecolor="#FFFFFF" fontSize="8.0" hTextAlign="Right" >
 				<expression><![CDATA[($F{recurring_fees}.doubleValue() - $F{ror_charge}.doubleValue()) + " EGP"]]></expression>
 			</element>
 
@@ -224,7 +224,7 @@
 			<element kind="staticText" x="20" y="215" width="260" height="12" forecolor="#E0E0E0" fontSize="8.0">
 				<text><![CDATA[Domestic Overage]]></text>
 			</element>
-			<element kind="textField" x="420" y="215" width="115" height="12" forecolor="#FF4444" fontSize="8.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="215" width="115" height="12" forecolor="#FF4444" fontSize="8.0" hTextAlign="Right" >
 				<expression><![CDATA[($F{overage_charge} != null ? $F{overage_charge} : 0) + " EGP"]]></expression>
 			</element>
 
@@ -232,7 +232,7 @@
 			<element kind="staticText" x="20" y="242" width="260" height="12" forecolor="#E0E0E0" fontSize="8.0">
 				<text><![CDATA[Roaming Overage]]></text>
 			</element>
-			<element kind="textField" x="420" y="242" width="115" height="12" forecolor="#FFAA00" fontSize="8.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="242" width="115" height="12" forecolor="#FFAA00" fontSize="8.0" hTextAlign="Right" >
 				<expression><![CDATA[($F{roaming_charge} != null ? $F{roaming_charge} : 0) + " EGP"]]></expression>
 			</element>
 
@@ -240,7 +240,7 @@
 			<element kind="staticText" x="20" y="269" width="260" height="12" forecolor="#E0E0E0" fontSize="8.0">
 				<text><![CDATA[Government Tax (14%)]]></text>
 			</element>
-			<element kind="textField" x="420" y="269" width="115" height="12" forecolor="#FFFFFF" fontSize="8.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="269" width="115" height="12" forecolor="#FFFFFF" fontSize="8.0" hTextAlign="Right" >
 				<expression><![CDATA[$F{taxes} + " EGP"]]></expression>
 			</element>
 
@@ -248,7 +248,7 @@
 			<element kind="staticText" x="20" y="282" width="260" height="12" forecolor="#808080" fontSize="8.0">
 				<text><![CDATA[One-time / Add-ons]]></text>
 			</element>
-			<element kind="textField" x="420" y="282" width="115" height="12" forecolor="#808080" fontSize="8.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="282" width="115" height="12" forecolor="#808080" fontSize="8.0" hTextAlign="Right" >
 				<expression><![CDATA[$F{one_time_fees} + " EGP"]]></expression>
 			</element>
 
@@ -262,12 +262,12 @@
 			<element kind="staticText" x="22" y="288" width="200" height="22" forecolor="#FF0000" fontSize="12.0" bold="true" vTextAlign="Middle">
 				<text><![CDATA[TOTAL DUE]]></text>
 			</element>
-			<element kind="textField" x="230" y="282" width="305" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
+			<element kind="textField" x="230" y="282" width="305" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" hTextAlign="Right" vTextAlign="Middle" >
 				<expression><![CDATA[$F{total_amount} + " EGP"]]></expression>
 			</element>
 
 			<!-- USAGE NOTE -->
-			<element kind="textField" x="10" y="322" width="535" height="14" forecolor="#606060" fontSize="7.0" blankWhenNull="true">
+			<element kind="textField" x="10" y="322" width="535" height="14" forecolor="#606060" fontSize="7.0" >
 				<expression><![CDATA["Voice: " + $F{voice_usage} + " mins | Data: " + $F{data_usage} + " MB | SMS: " + $F{sms_usage} + " msgs"]]></expression>
 			</element>
 		</band>
@@ -275,13 +275,13 @@
 
 	<pageFooter height="35">
 		<element kind="line" x="10" y="2" width="535" height="1" forecolor="#333333"/>
-		<element kind="textField" x="10" y="8" width="170" height="14" forecolor="#808080" fontSize="7.0" blankWhenNull="true">
+		<element kind="textField" x="10" y="8" width="170" height="14" forecolor="#808080" fontSize="7.0" >
 			<expression><![CDATA["Care: " + $P{COMPANY_CARE}]]></expression>
 		</element>
-		<element kind="textField" x="190" y="8" width="170" height="14" forecolor="#808080" fontSize="7.0" hTextAlign="Center" blankWhenNull="true">
+		<element kind="textField" x="190" y="8" width="170" height="14" forecolor="#808080" fontSize="7.0" hTextAlign="Center" >
 			<expression><![CDATA[$P{COMPANY_WEB}]]></expression>
 		</element>
-		<element kind="textField" x="370" y="8" width="175" height="14" forecolor="#808080" fontSize="7.0" hTextAlign="Right" blankWhenNull="true">
+		<element kind="textField" x="370" y="8" width="175" height="14" forecolor="#808080" fontSize="7.0" hTextAlign="Right" >
 			<expression><![CDATA[$P{COMPANY_EMAIL}]]></expression>
 		</element>
 	</pageFooter>
