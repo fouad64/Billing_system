@@ -74,37 +74,25 @@
           </div>
           <div class="stat-main-hero">
             <span class="stat-value-large">{stats.contracts}</span>
-            <span class="stat-label">Total Active Contracts</span>
+            <span class="stat-label">Total Contracts</span>
           </div>
         </div>
         <div class="status-grid-hero">
-          <div class="status-item-premium">
-            <div class="val-group">
-              <span class="dot active"></span>
-              <span class="val text-active">{stats.active}</span>
-            </div>
+          <div class="status-item-box status-active">
+            <span class="val">{stats.active}</span>
             <span class="lbl">Active</span>
           </div>
-          <div class="status-item-premium">
-            <div class="val-group">
-              <span class="dot suspended"></span>
-              <span class="val text-suspended">{stats.suspended}</span>
-            </div>
-            <span class="lbl">Suspended</span>
+          <div class="status-item-box status-onhold">
+            <span class="val">{stats.suspended}</span>
+            <span class="lbl">On Hold</span>
           </div>
-          <div class="status-item-premium">
-            <div class="val-group">
-              <span class="dot debt"></span>
-              <span class="val text-debt">{stats.suspended_debt}</span>
-            </div>
-            <span class="lbl">In Debt</span>
+          <div class="status-item-box status-suspended">
+            <span class="val">{stats.suspended_debt}</span>
+            <span class="lbl">Suspended (Debt)</span>
           </div>
-          <div class="status-item-premium">
-            <div class="val-group">
-              <span class="dot terminated"></span>
-              <span class="val text-terminated">{stats.terminated}</span>
-            </div>
-            <span class="lbl">Terminated</span>
+          <div class="status-item-box status-terminated">
+            <span class="val">{stats.terminated}</span>
+            <span class="lbl">Deactivated</span>
           </div>
         </div>
       </div>
@@ -226,26 +214,34 @@
   .status-grid-hero { 
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 1.5rem;
-    background: rgba(255,255,255,0.03);
-    padding: 1.5rem;
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.05);
-    margin: 0 auto;
+    gap: 1rem;
     width: 100%;
   }
-  .status-item-premium { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-  .val-group { display: flex; align-items: center; gap: 0.75rem; }
-  .status-item-premium .dot { 
-    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; 
-    animation: pulse-glow 2s infinite; 
+  .status-item-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
   }
-  .status-item-premium .dot.active { background: #22C55E; box-shadow: 0 0 15px rgba(34, 197, 94, 0.5); }
-  .status-item-premium .dot.suspended { background: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
-  .status-item-premium .dot.debt { background: #F59E0B; box-shadow: 0 0 15px rgba(245, 158, 11, 0.5); }
-  .status-item-premium .dot.terminated { background: #A855F7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5); }
-  .status-item-premium .val { font-size: 1.35rem; font-weight: 800; display: block; line-height: 1; }
-  .status-item-premium .lbl { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-top: 0.2rem; display: block; }
+  .status-item-box .val { font-size: 1.5rem; font-weight: 800; display: block; line-height: 1; margin-bottom: 0.25rem; }
+  .status-item-box .lbl { font-size: 0.7rem; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+
+  .status-active { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.2); }
+  .status-active .val { color: #22C55E; }
+  
+  .status-onhold { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); }
+  .status-onhold .val { color: #F59E0B; }
+  
+  .status-suspended { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); }
+  .status-suspended .val { color: #EF4444; }
+  
+  .status-terminated { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.2); }
+  .status-terminated .val { color: #A855F7; }
+
+  .status-item-box:hover { transform: scale(1.05); background: rgba(255, 255, 255, 0.05); }
 
   .card-content-centered { 
     display: flex; 

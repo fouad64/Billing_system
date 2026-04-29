@@ -69,23 +69,26 @@
 
   // Formatter: Logic updated because API sends MB
   // Smart Formatter: Logic updated to handle legacy SMS records and dynamic usage
-  function formatUsage(value, serviceId, type, destination) {
-    if (value === 0 && (serviceId === 2 || String(destination).toLowerCase() === 'internet')) return '0 MB';
+  function formatUsage(value, serviceId, type, destination, serviceType) {
+    if (value === 0 && (serviceType === 'data' || String(destination).toLowerCase() === 'internet')) return '0 MB';
     if (value === 0) return '0';
     if (!value) return '—';
 
-    // Prioritize Raw Service ID: 1=Voice, 2=Data, 3=SMS
-    let effectiveType = 'other';
-    if (serviceId === 1) effectiveType = 'voice';
-    else if (serviceId === 2) effectiveType = 'data';
-    else if (serviceId === 3) effectiveType = 'sms';
-    else {
-      // Fallback to string analysis
-      const typeStr = String(type || '').toLowerCase();
-      const destStr = String(destination || '').toLowerCase();
-      if (typeStr.includes('voice') || typeStr.includes('call')) effectiveType = 'voice';
-      else if (typeStr.includes('data') || typeStr.includes('internet') || destStr === 'internet') effectiveType = 'data';
-      else if (typeStr.includes('sms')) effectiveType = 'sms';
+    // Prioritize Service Type from DB
+    let effectiveType = serviceType || 'other';
+    
+    if (effectiveType === 'other') {
+      // Fallback to legacy logic if serviceType is missing
+      if (serviceId === 1) effectiveType = 'voice';
+      else if (serviceId === 2) effectiveType = 'data';
+      else if (serviceId === 3) effectiveType = 'sms';
+      else {
+        const typeStr = String(type || '').toLowerCase();
+        const destStr = String(destination || '').toLowerCase();
+        if (typeStr.includes('voice') || typeStr.includes('call')) effectiveType = 'voice';
+        else if (typeStr.includes('data') || typeStr.includes('internet') || destStr === 'internet') effectiveType = 'data';
+        else if (typeStr.includes('sms')) effectiveType = 'sms';
+      }
     }
 
     switch (effectiveType) {
@@ -105,22 +108,22 @@
     }
   }
 
-  const getTypeInfo = (serviceId, ratedType, destination) => {
-    // Priority 1: Raw Service ID
-    if (serviceId === 1) return { label: 'Voice', class: 'badge-voice' };
-    if (serviceId === 2) return { label: 'Data', class: 'badge-data' };
-    if (serviceId === 3) return { label: 'SMS', class: 'badge-sms' };
+  const getTypeInfo = (serviceId, ratedType, destination, serviceType) => {
+    // Standardized Mapping
+    const mapping = {
+      'voice': { label: 'Voice', class: 'badge-voice', icon: 'M12 18.5a6.5 6.5 0 1 0-7-7 1 1 0 0 1-1-1 1 1 0 0 1 1-1 8.5 8.5 0 1 1 9 9 1 1 0 0 1-1-1 1 1 0 0 1 1-1zM5.5 10.5A2.5 2.5 0 1 0 8 13a1 1 0 0 1 1 1 1 1 0 0 1-1 1 4.5 4.5 0 1 1 5-5 1 1 0 0 1 1 1 1 1 0 0 1-1 1z' },
+      'data': { label: 'Data', class: 'badge-data', icon: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
+      'sms': { label: 'SMS', class: 'badge-sms', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' }
+    };
 
-    // Priority 2: Destination Analysis
-    if (String(destination).toLowerCase() === 'internet') return { label: 'Data', class: 'badge-data' };
+    if (mapping[serviceType]) return mapping[serviceType];
 
-    // Fallback: Bundle analysis
-    const typeStr = String(ratedType || '').toLowerCase();
-    if (typeStr.includes('voice')) return { label: 'Voice', class: 'badge-voice' };
-    if (typeStr.includes('data')) return { label: 'Data', class: 'badge-data' };
-    if (typeStr.includes('sms')) return { label: 'SMS', class: 'badge-sms' };
+    // Fallbacks
+    if (serviceId === 1 || String(ratedType).toLowerCase().includes('voice')) return mapping.voice;
+    if (serviceId === 2 || String(ratedType).toLowerCase().includes('data')) return mapping.data;
+    if (serviceId === 3 || String(ratedType).toLowerCase().includes('sms')) return mapping.sms;
     
-    return { label: 'Service', class: 'badge-secondary' };
+    return { label: 'Service', class: 'badge-secondary', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' };
   };
 
   $effect(() => { loadCDRs(); });
@@ -178,20 +181,21 @@
             </thead>
             <tbody>
             {#each filteredCDRs as cdr}
-              {@const typeInfo = getTypeInfo(cdr.service_id, cdr.type, cdr.destination)}
+              {@const typeInfo = getTypeInfo(cdr.service_id, cdr.type, cdr.destination, cdr.service_type)}
               <tr>
                 <td><span class="id-badge">#{cdr.id}</span></td>
                 <td><span class="phone-num">{cdr.msisdn}</span></td>
                 <td><span class="phone-num">{cdr.destination || '—'}</span></td>
-                <td><span class="usage-text">{formatUsage(cdr.duration, cdr.service_id, cdr.type, cdr.destination)}</span></td>
+                <td><span class="usage-text">{formatUsage(cdr.duration, cdr.service_id, cdr.type, cdr.destination, cdr.service_type)}</span></td>
                 <td>
-                    <div style="display:flex; flex-direction:column; gap:4px">
-                      <span class="badge {typeInfo.class} badge-base" style="width:fit-content">
-                        {typeInfo.label}
-                      </span>
-                      <span style="font-size:0.65rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.02em">
-                        {cdr.type || 'System'}
-                      </span>
+                    <div style="display:flex; align-items:center; gap:8px">
+                      <div class="icon-box {typeInfo.class}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d={typeInfo.icon}/></svg>
+                      </div>
+                      <div style="display:flex; flex-direction:column">
+                        <span class="type-label">{typeInfo.label}</span>
+                        <span class="type-subtext">{cdr.type || 'System Record'}</span>
+                      </div>
                     </div>
                 </td>
                 <td class="text-muted">{new Date(cdr.timestamp).toLocaleString()}</td>
@@ -261,13 +265,17 @@
 
   .usage-text { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F59E0B; }
 
-  .badge-base { border-left: 3px solid transparent; }
-  .badge-voice { border-left-color: #3B82F6; color: #3B82F6; background: rgba(59, 130, 246, 0.1); }
-  .badge-data { border-left-color: #22C55E; color: #22C55E; background: rgba(34, 197, 94, 0.1); }
-  .badge-sms { border-left-color: #A855F7; color: #A855F7; background: rgba(168, 85, 247, 0.1); }
-  .badge-units { border-left-color: #F59E0B; color: #F59E0B; background: rgba(245, 158, 11, 0.1); }
-  .badge-error { border-left-color: #EF4444; color: #EF4444; background: rgba(239, 68, 68, 0.1); }
   .badge-secondary { border-left-color: #9CA3AF; color: #9CA3AF; background: rgba(156, 163, 175, 0.1); }
+
+  .icon-box { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .icon-box svg { width: 18px; height: 18px; }
+  .icon-box.badge-voice { background: rgba(59, 130, 246, 0.1); color: #3B82F6; }
+  .icon-box.badge-data { background: rgba(34, 197, 94, 0.1); color: #22C55E; }
+  .icon-box.badge-sms { background: rgba(168, 85, 247, 0.1); color: #A855F7; }
+  .icon-box.badge-secondary { background: rgba(156, 163, 175, 0.1); color: #9CA3AF; }
+
+  .type-label { font-weight: 700; font-size: 0.85rem; color: #FFFFFF; }
+  .type-subtext { font-size: 0.65rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
 
   .loading-state, .empty-state { padding: 4rem; text-align: center; color: var(--text-muted); }
   .spinner { width: 40px; height: 40px; border: 4px solid rgba(224, 8, 0, 0.1); border-top-color: var(--red); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
