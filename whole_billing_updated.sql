@@ -2948,3 +2948,285 @@ WHERE cc.service_package_id = sp.id AND cc.quota_limit = 0;
 UPDATE user_account SET password = '123456';
 COMMIT;
 
+
+--==========================================================
+-- 1. add_new_service_package
+-- Creates a new service bundle (Voice/Data/SMS) in the catalog.
+-- Parameters: name, type, amount, priority, price, description, is_roaming.
+-- Returns: The ID of the newly created package.
+--==========================================================
+CREATE OR REPLACE FUNCTION add_new_service_package(
+    p_name character varying,
+    p_type public.service_type,
+    p_amount numeric,
+    p_priority integer,
+    p_price numeric,
+    p_description text DEFAULT NULL,
+    p_is_roaming boolean DEFAULT false
+) RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_new_id INTEGER;
+BEGIN
+    INSERT INTO service_package (name, type, amount, priority, price, description, is_roaming)
+    VALUES (p_name, p_type, p_amount, p_priority, p_price, p_description, p_is_roaming)
+    RETURNING id INTO v_new_id;
+
+    RETURN v_new_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'add_new_service_package failed: %', SQLERRM;
+END;
+$$;
+
+--==========================================================
+-- 2. update_service_package
+-- Updates an existing service package's details.
+-- Parameters: id (target), plus all package fields.
+-- Returns: The updated record as a table row.
+--==========================================================
+CREATE OR REPLACE FUNCTION update_service_package(
+    p_id INTEGER,
+    p_name VARCHAR(255),
+    p_type service_type,
+    p_amount NUMERIC(12,4),
+    p_priority INTEGER,
+    p_price NUMERIC(12,2),
+    p_description TEXT,
+    p_is_roaming BOOLEAN DEFAULT FALSE
+) RETURNS TABLE(
+    id INTEGER,
+    name VARCHAR(255),
+    type service_type,
+    amount NUMERIC(12,4),
+    priority INTEGER,
+    price NUMERIC(12,2),
+    description TEXT,
+    is_roaming BOOLEAN
+) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+        UPDATE service_package 
+        SET 
+            name = p_name,
+            type = p_type,
+            amount = p_amount,
+            priority = p_priority,
+            price = p_price,
+            description = p_description,
+            is_roaming = p_is_roaming
+        WHERE service_package.id = p_id
+        RETURNING 
+            service_package.id,
+            service_package.name,
+            service_package.type,
+            service_package.amount,
+            service_package.priority,
+            service_package.price,
+            service_package.description,
+            service_package.is_roaming;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Service package with id % not found', p_id;
+    END IF;
+END;
+$$;
+
+--==========================================================
+-- 3. delete_service_package
+-- Safely removes a service package from the catalog.
+-- Logic: Checks for active contract consumptions or active addons before deleting
+-- to prevent foreign key or business logic violations.
+-- Parameters: p_id (ID of the package to delete).
+--==========================================================
+CREATE OR REPLACE FUNCTION delete_service_package(p_id INTEGER) 
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+    -- Check if service package is referenced in any active contracts or addons
+    IF EXISTS (
+        SELECT 1 FROM contract_consumption cc 
+        WHERE cc.service_package_id = p_id AND cc.is_billed = FALSE
+    ) THEN
+        RAISE EXCEPTION 'Cannot delete service package: it has active consumption records';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM contract_addon ca 
+        WHERE ca.service_package_id = p_id AND ca.is_active = TRUE
+    ) THEN
+        RAISE EXCEPTION 'Cannot delete service package: it has active addons';
+    END IF;
+
+    DELETE FROM service_package WHERE id = p_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Service package with id % not found', p_id;
+    END IF;
+END;
+$$;
+
+--==========================================================
+-- 4. create_rateplan_with_packages
+-- Atomic operation to create a Rate Plan and link it to multiple Service Packages.
+-- Parameters: name, overage rates (ror), base price, and an ARRAY of service package IDs.
+-- Logic: Creates rateplan first, then loops through IDs to populate rateplan_service_package.
+--==========================================================
+CREATE OR REPLACE FUNCTION create_rateplan_with_packages(
+    p_name VARCHAR(255),
+    p_ror_voice NUMERIC(10,2),
+    p_ror_data NUMERIC(10,2), 
+    p_ror_sms NUMERIC(10,2),
+    p_price NUMERIC(10,2),
+    p_service_package_ids INTEGER[]
+) RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_rateplan_id INTEGER;
+    v_package_id INTEGER;
+BEGIN
+    -- Create the rateplan
+    INSERT INTO rateplan (name, ror_voice, ror_data, ror_sms, price)
+    VALUES (p_name, p_ror_voice, p_ror_data, p_ror_sms, p_price)
+    RETURNING id INTO v_rateplan_id;
+
+    -- Link service packages to the rateplan
+    IF p_service_package_ids IS NOT NULL THEN
+        FOREACH v_package_id IN ARRAY p_service_package_ids
+        LOOP
+            IF NOT EXISTS (SELECT 1 FROM service_package WHERE id = v_package_id) THEN
+                RAISE EXCEPTION 'Service package with id % does not exist', v_package_id;
+            END IF;
+
+            INSERT INTO rateplan_service_package (rateplan_id, service_package_id)
+            VALUES (v_rateplan_id, v_package_id);
+        END LOOP;
+    END IF;
+
+    RETURN v_rateplan_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'create_rateplan_with_packages failed: %', SQLERRM;
+END;
+$$;
+
+--==========================================================
+-- 5. delete_rateplan
+-- Safely removes a rate plan and its bundle associations.
+-- Logic: Prevents deletion if any active customer contracts are currently using this plan.
+-- Parameters: p_rateplan_id.
+--==========================================================
+CREATE OR REPLACE FUNCTION delete_rateplan(p_rateplan_id INTEGER) RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Check if rateplan is used by any active contracts
+    IF EXISTS (SELECT 1 FROM contract WHERE rateplan_id = p_rateplan_id) THEN
+        RAISE EXCEPTION 'Cannot delete rateplan: it is assigned to active contracts';
+    END IF;
+
+    -- Delete service package associations first
+    DELETE FROM rateplan_service_package WHERE rateplan_id = p_rateplan_id;
+
+    -- Delete the rateplan
+    DELETE FROM rateplan WHERE id = p_rateplan_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Rateplan with id % not found', p_rateplan_id;
+    END IF;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'delete_rateplan failed: %', SQLERRM;
+END;
+$$;
+
+--==========================================================
+-- 6. update_rateplan
+-- Multi-purpose function to update Rate Plan metadata and its linked bundles.
+-- Parameters: id, plus optional fields (COALESCE handles partial updates).
+-- Logic: If p_service_package_ids is provided, it clears and replaces old associations.
+--==========================================================
+CREATE OR REPLACE FUNCTION update_rateplan(
+    p_rateplan_id INTEGER,
+    p_name VARCHAR(255) DEFAULT NULL,
+    p_ror_voice NUMERIC(10,2) DEFAULT NULL,
+    p_ror_data NUMERIC(10,2) DEFAULT NULL,
+    p_ror_sms NUMERIC(10,2) DEFAULT NULL,
+    p_price NUMERIC(10,2) DEFAULT NULL,
+    p_service_package_ids INTEGER[] DEFAULT NULL
+) RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_package_id INTEGER;
+BEGIN
+    -- Check if rateplan exists
+    IF NOT EXISTS (SELECT 1 FROM rateplan WHERE id = p_rateplan_id) THEN
+        RAISE EXCEPTION 'Rateplan with id % does not exist', p_rateplan_id;
+    END IF;
+
+    -- Update rateplan fields (only non-null values)
+    UPDATE rateplan 
+    SET 
+        name = COALESCE(p_name, name),
+        ror_voice = COALESCE(p_ror_voice, ror_voice),
+        ror_data = COALESCE(p_ror_data, ror_data),
+        ror_sms = COALESCE(p_ror_sms, ror_sms),
+        price = COALESCE(p_price, price)
+    WHERE id = p_rateplan_id;
+
+    -- Update service package associations if provided
+    IF p_service_package_ids IS NOT NULL THEN
+        -- Remove existing associations
+        DELETE FROM rateplan_service_package WHERE rateplan_id = p_rateplan_id;
+
+        -- Add new associations
+        FOREACH v_package_id IN ARRAY p_service_package_ids
+        LOOP
+            IF NOT EXISTS (SELECT 1 FROM service_package WHERE id = v_package_id) THEN
+                RAISE EXCEPTION 'Service package with id % does not exist', v_package_id;
+            END IF;
+
+            INSERT INTO rateplan_service_package (rateplan_id, service_package_id)
+            VALUES (p_rateplan_id, v_package_id);
+        END LOOP;
+    END IF;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'update_rateplan failed: %', SQLERRM;
+END;
+$$;
+
+--==========================================================
+-- 10. get_rateplan_data
+-- Fetches detailed metadata for a specific rate plan.
+-- Parameters: p_rateplan_id.
+-- Returns: TABLE with id, name, ror_data, ror_voice, ror_sms, price.
+--==========================================================
+CREATE OR REPLACE FUNCTION get_rateplan_data(p_rateplan_id INTEGER)
+RETURNS TABLE(
+    id INTEGER,
+    name VARCHAR(255),
+    ror_data NUMERIC(10,2),
+    ror_voice NUMERIC(10,2),
+    ror_sms NUMERIC(10,2),
+    price NUMERIC(10,2)
+) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+        SELECT 
+            r.id,
+            r.name,
+            r.ror_data,
+            r.ror_voice,
+            r.ror_sms,
+            r.price
+        FROM rateplan r
+        WHERE r.id = p_rateplan_id;
+END;
+$$;
