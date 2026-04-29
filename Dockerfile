@@ -10,7 +10,10 @@ RUN addgroup --system javauser && adduser --system --ingroup javauser javauser
 # 2. Copy local artifacts directly
 # (Requires that you've run the build locally first)
 COPY target/Telecom-Billing-Engine.jar app.jar
-COPY src/main/webapp webapp_static
+COPY src/main/webapp ./webapp_static
+COPY src/main/resources/invoice.jrxml .
+COPY src/main/resources/logo.svg .
+COPY src/main/resources/Pictures ./Pictures
 
 # 3. Set ownership to the non-root user
 RUN chown -R javauser:javauser /app

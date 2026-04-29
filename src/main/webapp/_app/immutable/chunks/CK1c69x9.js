@@ -1,0 +1,1 @@
+import{d as p,ah as r,p as u}from"./C_JFfMrN.js";import{B as i}from"./BdSqxBuq.js";function h(s,a,...n){var o=new i(s);p(()=>{const e=a()??null;o.ensure(e,e&&(c=>e(c,...n)))},r)}const t=u({message:null,type:"success"});function f(s,a="success"){t.message=s,t.type=a}function T(){t.message=null}export{h as a,T as h,f as s,t};

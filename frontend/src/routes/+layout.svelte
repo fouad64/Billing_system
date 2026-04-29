@@ -79,7 +79,7 @@
 					<a
 						href="/profile"
 						class="nav-link"
-						class:active={$page.url.pathname === '/profile'}
+						class:active={$page.url.pathname === '/profile' || ($page.url.pathname.startsWith('/profile') && !$page.url.pathname.includes('/invoices'))}
 					>Profile</a>
 
 					<a

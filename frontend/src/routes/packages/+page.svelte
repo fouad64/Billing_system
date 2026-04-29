@@ -37,7 +37,8 @@
       const timer = setTimeout(async () => {
         const res = await fetch(`/api/admin/contracts?search=${encodeURIComponent(msisdnSearch)}`);
         if (res.ok) {
-          searchResults = await res.json();
+          const data = await res.json();
+          searchResults = data.data || [];
           showDropdown = true;
         }
       }, 300);
@@ -175,12 +176,17 @@
         class="input" 
         type="text" 
         bind:value={msisdnSearch} 
+        onfocus={() => { if (searchResults.length > 0) showDropdown = true; }}
+        onblur={() => setTimeout(() => showDropdown = false, 200)}
         oninput={() => selectedContract = null}
         placeholder="Type MSISDN or Name..." 
       />
       
       {#if showDropdown && searchResults.length > 0}
-        <div class="search-results card-glass">
+        <div class="search-results card animate-fade">
+          <div class="dropdown-header" style="padding: 8px 16px; font-size: 0.7rem; color: var(--text-muted); border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02)">
+            Top Matches
+          </div>
           {#each searchResults as contract}
             {@const pName = (contract.rateplanName || '').toLowerCase()}
             {@const badgeClass = pName.includes('basic') ? 'badge-plan-basic' : pName.includes('premium') ? 'badge-plan-premium' : pName.includes('elite') ? 'badge-plan-elite' : pName.includes('standard') || pName.includes('gold') ? 'badge-plan-standard' : 'badge-customer'}
@@ -649,7 +655,7 @@
     overflow-y: auto;
     border: 1px solid rgba(255,255,255,0.1);
     box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-    background: rgba(15, 15, 25, 0.95);
+    background: rgba(10, 10, 15, 0.98) !important;
     backdrop-filter: blur(10px);
     border-radius: 12px;
   }
@@ -657,43 +663,31 @@
     width: 100%;
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 12px 16px;
-    background: none;
+    background: transparent;
     border: none;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     color: white;
     cursor: pointer;
     text-align: left;
-    transition: background 0.2s;
+    transition: all 0.2s;
+    transform: none !important;
   }
-  .result-item:hover { background: rgba(224, 8, 0, 0.2); }
+  .result-item:hover { 
+    background: rgba(255, 255, 255, 0.08) !important; 
+    border-left: 4px solid var(--red);
+    padding-left: 12px;
+  }
   .res-num { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #EF4444; }
   .res-name { font-size: 0.85rem; color: #94a3b8; }
   .selection-status { margin-top: 1rem; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 8px; color: #22C55E; font-size: 0.9rem; }
 
-  .badge-plan-basic { 
-    background: rgba(59, 130, 246, 0.1); 
-    color: #60a5fa; 
-    border: 1px solid rgba(59, 130, 246, 0.2);
-    border-left: 3px solid #3b82f6;
-  }
-  .badge-plan-standard { 
-    background: rgba(255, 255, 255, 0.05); 
-    color: #cbd5e1; 
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-left: 3px solid #94a3b8;
-  }
-  .badge-plan-premium { 
+  .badge-plan-basic, .badge-plan-standard, .badge-plan-premium, .badge-plan-gold, .badge-plan-elite { 
     background: rgba(248, 113, 113, 0.1); 
     color: #fca5a5; 
     border: 1px solid rgba(248, 113, 113, 0.2);
     border-left: 3px solid #f87171;
-  }
-  .badge-plan-elite { 
-    background: rgba(139, 92, 246, 0.1); 
-    color: #a78bfa; 
-    border: 1px solid rgba(139, 92, 246, 0.2);
-    border-left: 3px solid #8b5cf6;
   }
 
 </style>

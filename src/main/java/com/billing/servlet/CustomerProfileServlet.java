@@ -26,23 +26,8 @@ public class CustomerProfileServlet extends BaseServlet {
         }
     }
 
-    private static JasperReport cachedReport = null;
-
     private JasperReport getCachedReport() throws JRException {
-        if (cachedReport == null) {
-            synchronized (CustomerProfileServlet.class) {
-                if (cachedReport == null) {
-                    try (InputStream is = getClass().getResourceAsStream("/invoice.jrxml")) {
-                        net.sf.jasperreports.engine.JasperReportsContext context = net.sf.jasperreports.engine.DefaultJasperReportsContext.getInstance();
-                        net.sf.jasperreports.engine.design.JasperDesign design = net.sf.jasperreports.jackson.util.JacksonUtil.getInstance(context).loadXml(is, net.sf.jasperreports.engine.design.JasperDesign.class);
-                        cachedReport = JasperCompileManager.compileReport(design);
-                    } catch (IOException e) {
-                        throw new JRException("Failed to load invoice.jrxml", e);
-                    }
-                }
-            }
-        }
-        return cachedReport;
+        return com.billing.util.JasperLoader.getReport("invoice.jrxml");
     }
 
     @Override
@@ -113,8 +98,8 @@ public class CustomerProfileServlet extends BaseServlet {
                     Map<String, Object> params = new HashMap<>();
                     params.put("BILL_ID", billId);
                     
-                    // Safe Stream-based logo loading (Fixed NPE)
-                    InputStream logoStream = getClass().getResourceAsStream("/logo.svg");
+                    // Safe Stream-based logo loading using central utility
+                    InputStream logoStream = com.billing.util.JasperLoader.getResourceStream("logo.svg");
                     params.put("LOGO_PATH", logoStream);
                     
                     // --- HARDENING: Inject Company Info as Parameters (Loaded from config.properties) ---
@@ -136,8 +121,6 @@ public class CustomerProfileServlet extends BaseServlet {
             }
         } catch (Throwable e) {
             e.printStackTrace();
-            // ... rest of the catch block
-            // Clear response and send JSON error
             try {
                 if (!res.isCommitted()) {
                     res.reset();

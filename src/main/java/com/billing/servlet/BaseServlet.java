@@ -73,4 +73,14 @@ public abstract class BaseServlet extends HttpServlet {
         if (pathInfo == null || pathInfo.equals("/")) return null;
         return pathInfo.substring(1);
     }
+
+    protected int getIntParam(HttpServletRequest req, String name, int defaultValue) {
+        String val = req.getParameter(name);
+        if (val == null || val.trim().isEmpty()) return defaultValue;
+        try {
+            return Integer.parseInt(val);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
 }

@@ -162,7 +162,7 @@ public class DB {
         }
     }
 
-    private static String getEnvOrProp(String envKey, String propKey) {
+    public static String getEnvOrProp(String envKey, String propKey) {
         // 1. Check Environment Variables
         String val = System.getenv(envKey);
         

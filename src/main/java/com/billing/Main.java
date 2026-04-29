@@ -49,37 +49,41 @@ public class Main {
         valve.setProtocolHeader("X-Forwarded-Proto");
         ctx.getPipeline().addValve(valve);
 
+        // --- WELCOME FILES: Serve index.html for root ---
+        ctx.addWelcomeFile("index.html");
+
         // FIX: Shaded JAR Support
-        // Tomcat 11 doesn't scan inside a Fat JAR by default. We must manually map the JAR 
-        // as a JarResourceSet so that @WebServlet and @WebFilter annotations are discovered.
         File additionWebInfClasses = new File("target/classes");
-        
-        // Dynamic JAR Detection: Find the path of the currently executing JAR
         String jarPath = Main.class.getProtectionDomain().getCodeSource().getLocation().getPath();
         File jarFile = new File(jarPath);
         
         WebResourceRoot resources = new StandardRoot(ctx);
         if (additionWebInfClasses.exists()) {
-            // IDE Mode: Classes are in target/classes
             resources.addPreResources(new DirResourceSet(resources, "/WEB-INF/classes",
                     additionWebInfClasses.getAbsolutePath(), "/"));
-            
             System.out.println("Mapping resources from IDE path: " + additionWebInfClasses.getAbsolutePath());
         } else if (jarFile.isFile() && jarFile.getName().endsWith(".jar")) {
-            // Production Mode: Classes are inside the JAR. We map the JAR dynamically.
             resources.addJarResources(new JarResourceSet(resources, "/WEB-INF/classes",
                     jarFile.getAbsolutePath(), "/"));
-            
             System.out.println("Mapping resources from Dynamic JAR: " + jarFile.getAbsolutePath());
         }
 
         // UNIVERSAL FIX: Always prioritize the filesystem 'webapp' folder if it exists
-        // This ensures Docker containers with externalized webapp folders (via COPY) work correctly.
         if (webappFile.exists() && webappFile.isDirectory()) {
             resources.addPreResources(new DirResourceSet(resources, "/",
                     webappFile.getAbsolutePath(), "/"));
             System.out.println("✔ Prioritizing filesystem webapp: " + webappFile.getAbsolutePath());
         }
+        
+        // FIX: Increase cache size to avoid "insufficient free space" warnings
+        resources.setCacheMaxSize(100 * 1024); // 100MB
+        
+        // --- SPA FALLBACK: If a file isn't found, serve index.html (for client-side routing) ---
+        org.apache.tomcat.util.descriptor.web.ErrorPage spaFallback = new org.apache.tomcat.util.descriptor.web.ErrorPage();
+        spaFallback.setErrorCode(404);
+        spaFallback.setLocation("/index.html");
+        ctx.addErrorPage(spaFallback);
+
         ctx.setResources(resources);
 
         System.out.println("Configuring app with docbase: " + webappFile.getAbsolutePath());
