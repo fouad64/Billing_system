@@ -3010,3 +3010,4 @@ END $$;
 -- ============================================================
 -- DATA INJECTION COMPLETE
 -- ============================================================
+CREATE INDEX IF NOT EXISTS idx_bill_status_search ON bill (status, contract_id);
