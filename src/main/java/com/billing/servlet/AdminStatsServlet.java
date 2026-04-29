@@ -22,9 +22,13 @@ public class AdminStatsServlet extends BaseServlet {
             // Rename fields to match frontend expectations
             Map<String, Object> formatted = new HashMap<>();
             formatted.put("customers", result.get("total_customers"));
-            formatted.put("contracts", result.get("active_contracts"));
+            formatted.put("contracts", result.get("total_contracts"));
+            formatted.put("active_contracts", result.get("active_contracts"));
+            formatted.put("suspended_contracts", result.get("suspended_contracts"));
+            formatted.put("suspended_debt_contracts", result.get("suspended_debt_contracts"));
+            formatted.put("terminated_contracts", result.get("terminated_contracts"));
             formatted.put("cdrs", result.get("total_cdrs"));
-            formatted.put("revenue", result.get("total_revenue"));
+            formatted.put("revenue", result.get("revenue"));
             formatted.put("pending_bills", result.get("pending_bills"));
 
             return formatted;

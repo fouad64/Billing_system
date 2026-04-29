@@ -152,9 +152,9 @@
             {#each invoices as inv}
               <tr>
                 <td><span class="id-badge">#{inv.id}</span></td>
-                <td class="text-muted">{inv.billingDate}</td>
-                <td><span class="amount-num">{inv.taxes + inv.recurringFees + inv.oneTimeFees} EGP</span></td>
-                <td><span class="badge badge-active">Paid</span></td>
+                <td class="text-muted">{inv.generationDate}</td>
+                <td><span class="amount-num">{inv.totalAmount} EGP</span></td>
+                <td><span class="badge badge-active">{inv.status === 'paid' ? 'Paid' : 'Pending'}</span></td>
               </tr>
             {/each}
           </tbody>
