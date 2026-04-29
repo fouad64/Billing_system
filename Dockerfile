@@ -20,7 +20,10 @@ RUN addgroup --system javauser && adduser --system --ingroup javauser javauser
 # 2. Install curl for healthchecks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# 3. Copy only the Fat JAR from the build stage
+# 3. Create required directories for CDR processing
+RUN mkdir -p /app/input /app/processed && chown -R javauser:javauser /app/input /app/processed
+
+# 4. Copy only the Fat JAR from the build stage
 COPY --from=build /build/target/Telecom-Billing-Engine.jar app.jar
 
 # 4. Copy the COMPILED webapp from the build stage (Important for 404 fix)
