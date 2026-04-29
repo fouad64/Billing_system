@@ -38,52 +38,58 @@ def get_env_config():
         "db_name": db_name
     }
 
-def get_billable_msisdns(config):
-    # Use psql to get MSISDNs
-    cmd = ["psql", "-h", config["db_host"], "-U", config["db_user"], "-d", config["db_name"], "-t", "-c", "SELECT msisdn FROM contract WHERE status IN ('active', 'suspended', 'suspended_debt', 'terminated')"]
+def get_msisdns_with_status(config):
+    # Fetch MSISDN and status to allow weighted selection
+    cmd = ["psql", "-h", config["db_host"], "-U", config["db_user"], "-d", config["db_name"], "-t", "-c", "SELECT msisdn, status FROM contract WHERE status IN ('active', 'suspended', 'suspended_debt', 'terminated')"]
     env = os.environ.copy()
     env["PGPASSWORD"] = config["db_pass"]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, env=env, check=True)
-        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        data = []
+        for line in result.stdout.splitlines():
+            parts = line.strip().split("|")
+            if len(parts) == 2:
+                data.append({"msisdn": parts[0].strip(), "status": parts[1].strip()})
+        return data
     except Exception as e:
         print(f"Error fetching MSISDNs: {e}")
         return []
 
-def generate_cdrs(msisdns, count=100):
+def generate_cdrs(subscribers, count=100):
     cdrs = []
-    # Destinations for variety (mix of numbers and URLs)
     phone_destinations = ["201090000001", "201090000002", "201090000003", "201000000008", "201223344556"]
     url_destinations = ["google.com", "facebook.com", "youtube.com", "fmrz-telecom.net", "whatsapp.net"]
     
     now = datetime.datetime.now()
     
+    # Separate for weighting
+    active_pool = [s["msisdn"] for s in subscribers if s["status"] == 'active']
+    blocked_pool = [s["msisdn"] for s in subscribers if s["status"] != 'active']
+    
     for i in range(count):
-        # 10% Chance of a "Ghost" MSISDN (not in database) to test auditing
-        if random.random() < 0.10:
+        roll = random.random()
+        
+        if roll < 0.05: # 5% Chance of a "Ghost" (Stranger)
             dial_a = "2019" + str(random.randint(10000000, 99999999))
-        else:
-            dial_a = random.choice(msisdns)
+        elif roll < 0.15: # 10% Chance of a "Blocked" subscriber (Suspended/Debt)
+            dial_a = random.choice(blocked_pool) if blocked_pool else random.choice(active_pool)
+        else: # 85% Chance of a "Healthy" active subscriber
+            dial_a = random.choice(active_pool) if active_pool else random.choice(blocked_pool)
             
-        # Randomly choose service: 1=Voice, 2=Data, 3=SMS
         service_id = random.choice([1, 2, 3])
         
         if service_id == 1: # Voice
             dial_b = random.choice(phone_destinations)
-            duration = random.randint(30, 3600) # seconds (30s to 1 hour)
+            duration = random.randint(30, 3600)
         elif service_id == 2: # Data
             dial_b = random.choice(url_destinations)
-            # Duration is in MB for the 9-column format (converted to bytes by Parser if needed)
-            duration = random.randint(1, 500) # 1MB to 500MB
+            duration = random.randint(1, 500)
         else: # SMS
             dial_b = random.choice(phone_destinations)
-            duration = 1 # count
+            duration = 1
             
-        # Distribute over the last 30 days
         start_time = now - datetime.timedelta(days=random.randint(0, 30), hours=random.randint(0, 23), minutes=random.randint(0, 59))
         time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 9 columns: file_id, dial_a, dial_b, start_time, duration, service_id, hplmn, vplmn, external_charges
         cdrs.append(f"1,{dial_a},{dial_b},{time_str},{duration},{service_id},EGYVO,,0")
         
     return cdrs
@@ -92,16 +98,16 @@ def main():
     print("🚀 FMRZ CDR Generator - Simulating real-world traffic...")
     
     config = get_env_config()
-    msisdns = get_billable_msisdns(config)
+    subscribers = get_msisdns_with_status(config)
     
-    if not msisdns:
-        print("❌ No active MSISDNs found in the database. Please ensure you have active contracts.")
+    if not subscribers:
+        print("❌ No MSISDNs found in the database.")
         return
         
-    print(f"✅ Found {len(msisdns)} active subscribers.")
+    print(f"✅ Found {len(subscribers)} subscribers in database.")
     
-    count = 150 # Number of CDRs to generate
-    cdrs = generate_cdrs(msisdns, count=count)
+    count = 150 
+    cdrs = generate_cdrs(subscribers, count=count)
     
     # Filename format: CDRYYYYMMDDHHMMSS_mmm.csv
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S_%f")[:-3]
