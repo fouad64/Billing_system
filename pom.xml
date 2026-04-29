@@ -219,15 +219,6 @@
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>jasperreports_extension.properties</resource>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>jasperreports_messages.properties</resource>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>jasperreports_messages_*.properties</resource>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
                                     <resource>metadata_messages-defaults.properties</resource>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">

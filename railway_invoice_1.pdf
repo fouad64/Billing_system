@@ -1,0 +1,16 @@
+HTTP/2 500 
+x-railway-cdn-edge: fastly/cache-lin1730027-LIN
+content-type: application/json;charset=UTF-8
+date: Wed, 29 Apr 2026 19:46:05 GMT
+server: railway-edge
+x-railway-edge: railway/europe-west4-drams3a
+x-railway-request-id: jVLR60dmTyy0YOQKvEOTxA
+x-cache: MISS
+x-cache-hits: 0
+x-served-by: cache-lin1730027-LIN
+content-length: 268
+
+{
+  "error": "Server Error: NoClassDefFoundError - Could not initialize class net.sf.jasperreports.extensions.ExtensionsEnvironment",
+  "message": "Server Error: NoClassDefFoundError - Could not initialize class net.sf.jasperreports.extensions.ExtensionsEnvironment"
+}
