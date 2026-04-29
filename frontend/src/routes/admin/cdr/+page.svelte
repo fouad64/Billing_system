@@ -119,9 +119,18 @@
     if (mapping[serviceType]) return mapping[serviceType];
 
     // Fallbacks
-    if (serviceId === 1 || String(ratedType).toLowerCase().includes('voice')) return mapping.voice;
-    if (serviceId === 2 || String(ratedType).toLowerCase().includes('data')) return mapping.data;
-    if (serviceId === 3 || String(ratedType).toLowerCase().includes('sms')) return mapping.sms;
+    const typeStr = String(ratedType || '').toLowerCase();
+    if (typeStr.includes('gift') || typeStr.includes('welcome')) {
+      return { 
+        label: 'Reward', 
+        class: 'badge-gift', 
+        icon: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z' 
+      };
+    }
+
+    if (serviceId === 1 || typeStr.includes('voice')) return mapping.voice;
+    if (serviceId === 2 || typeStr.includes('data')) return mapping.data;
+    if (serviceId === 3 || typeStr.includes('sms')) return mapping.sms;
     
     return { label: 'Service', class: 'badge-secondary', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' };
   };
@@ -271,7 +280,8 @@
   .icon-box svg { width: 18px; height: 18px; }
   .icon-box.badge-voice { background: rgba(59, 130, 246, 0.1); color: #3B82F6; }
   .icon-box.badge-data { background: rgba(34, 197, 94, 0.1); color: #22C55E; }
-  .icon-box.badge-sms { background: rgba(168, 85, 247, 0.1); color: #A855F7; }
+  .icon-box.badge-sms { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+  .icon-box.badge-gift { background: rgba(168, 85, 247, 0.15); color: #A855F7; border: 1px solid rgba(168, 85, 247, 0.3); }
   .icon-box.badge-secondary { background: rgba(156, 163, 175, 0.1); color: #9CA3AF; }
 
   .type-label { font-weight: 700; font-size: 0.85rem; color: #FFFFFF; }
