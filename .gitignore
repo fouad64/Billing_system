@@ -1,56 +1,46 @@
-# Java / Maven
+# --- Build & Runtime ---
 target/
-node_dist
+node/
+node_dist/
+tomcat.*/
+scratch/
+bin/
 *.class
+*.jar
 *.war
 *.ear
-*.jar
-.mvn/wrapper/maven-wrapper.jar
-.m2
-# SvelteKit / Node
-node_modules/
 .svelte-kit/
 build/
-.env
-.env.*
-!.env.example
-package-lock.json
-npm-debug.log*
+node_modules/
 
-# Database / Secrets
-src/main/resources/db.properties
-db.properties
-*.sql.gz
-*.sql.bak
-
-# IDEs
+# --- Tools & IDE Metadata ---
 .idea/
+.settings/
+.project
+.classpath
+.factorypath
+.kilo/
+.m2/
+.mvn/wrapper/maven-wrapper.jar
+.vscode/
 *.iml
 *.iws
 *.ipr
-.vscode/
-.project
-.classpath
-.settings/
-.factorypath
-.apt_generated/
 
-# OS
+# --- Environment & Secrets ---
+.env
+.env.*
+!.env.example
+db.properties
+src/main/resources/db.properties
+
+# --- Demo & Data Whitelisting ---
+# We keep these so the project is ready to demo out of the box
+!master_dummy_data.sql
+!massive_real_world_data.sql
+!create_missing_statements_demo.sql
+!whole_billing_updated.sql
+
+# --- Operating System ---
 .DS_Store
 Thumbs.db
-
-# Logs
-logs/
-*.log
-catalina.out
-
-# Local Artifacts
-.m2/
-
-# Keep Reference Solutions (Locally preserved but hidden from team repo)
-frontend_reference/
-backend_reference/
-frontend_backup_src/
-backend_backup_src/
-docs/
-.m2/

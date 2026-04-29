@@ -5,6 +5,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -15,27 +16,38 @@ public class AdminContractServlet extends BaseServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
         handle(res, () -> {
             String path = req.getPathInfo();
-            if (path == null || "/".equals(path)) {
+            
+            if ("/available-msisdn".equals(path)) {
+                String search = req.getParameter("search");
                 String msisdn = req.getParameter("msisdn");
-                if (msisdn != null && !msisdn.trim().isEmpty()) {
-                    String sql = "SELECT c.id, c.msisdn, c.status, c.available_credit as \"availableCredit\", " +
-                                 "ua.name as \"customerName\", r.name as \"rateplanName\" " +
-                                 "FROM contract c " +
-                                 "JOIN user_account ua ON c.user_account_id = ua.id " +
-                                 "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
-                                 "WHERE c.msisdn = ? " +
-                                 "ORDER BY c.id DESC";
-                    return DB.executeSelect(sql, msisdn);
+                String query = "SELECT msisdn FROM msisdn_pool WHERE is_available = TRUE";
+                List<Object> params = new ArrayList<>();
+                
+                if (search != null && !search.trim().isEmpty()) {
+                    query += " AND msisdn ILIKE ?";
+                    params.add("%" + search.trim() + "%");
+                } else if (msisdn != null && !msisdn.trim().isEmpty()) {
+                    query += " AND msisdn = ?";
+                    params.add(msisdn.trim());
                 }
                 
-                String sql = "SELECT c.id, c.msisdn, c.status, c.available_credit as \"availableCredit\", " +
-                             "ua.name as \"customerName\", r.name as \"rateplanName\" " +
-                             "FROM contract c " +
-                             "JOIN user_account ua ON c.user_account_id = ua.id " +
-                             "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
-                             "ORDER BY c.id DESC";
-                return DB.executeSelect(sql);
-            } else {
+                query += " ORDER BY msisdn LIMIT 50";
+                return DB.executeSelect(query, params.toArray());
+            }
+
+            if (path == null || "/".equals(path)) {
+                String search = req.getParameter("search");
+                int limit = getIntParam(req, "limit", 50);
+                int offset = getIntParam(req, "offset", 0);
+                
+                List<Map<String, Object>> list = DB.executeSelect("SELECT * FROM get_all_contracts(?, ?, ?)", search, limit, offset);
+                long total = 0;
+                if (!list.isEmpty()) {
+                    total = ((Number) list.get(0).get("total_count")).longValue();
+                }
+                return Map.of("data", list, "total", total);
+            }
+ else {
                 int id = Integer.parseInt(path.substring(1));
                 String sql = "SELECT c.*, ua.name as \"customerName\", r.name as \"rateplanName\", " +
                              "c.available_credit as \"availableCredit\" " +

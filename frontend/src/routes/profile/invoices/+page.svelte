@@ -6,6 +6,28 @@
   let invoices = $state([]);
   let loading = $state(true);
 
+  async function checkAuthAndLoad() {
+    loading = true;
+    try {
+      const authRes = await fetch('/api/auth/me', { credentials: 'include' });
+      if (!authRes.ok) {
+        window.location.href = '/login';
+        return;
+      }
+      const user = await authRes.json();
+      if (user.role !== 'customer') {
+        window.location.href = '/admin';
+        return;
+      }
+      
+      await loadInvoices();
+    } catch {
+      window.location.href = '/login';
+    } finally {
+      loading = false;
+    }
+  }
+
   async function loadInvoices() {
     try {
       const res = await fetch('/api/customer/invoices', { credentials: 'include' });
@@ -13,14 +35,13 @@
         invoices = await res.json();
       }
     } catch {}
-    loading = false;
   }
 
   function downloadPdf(id) {
     window.location.href = `/api/customer/invoices/download?id=${id}`;
   }
 
-  onMount(loadInvoices);
+  onMount(checkAuthAndLoad);
 </script>
 
 <svelte:head><title>My Invoices — FMRZ</title></svelte:head>

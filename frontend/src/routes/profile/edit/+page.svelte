@@ -40,6 +40,11 @@
         window.location.href = '/login';
         return;
       }
+      const user = await res.json();
+      if (user.role !== 'customer') {
+        window.location.href = '/admin';
+        return;
+      }
       await loadProfile();
     } catch {
       window.location.href = '/login';

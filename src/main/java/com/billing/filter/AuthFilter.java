@@ -31,10 +31,6 @@ public class AuthFilter implements Filter {
             return;
         }
 
-        // ARCHIVED: Security check disabled for now to simplify development.
-        // In production, you would re-enable the session check below.
-        chain.doFilter(request, response);
-        /*
         HttpSession session = req.getSession(false);
         if (session != null && session.getAttribute("user") != null) {
             chain.doFilter(request, response);
@@ -43,6 +39,5 @@ public class AuthFilter implements Filter {
             res.setContentType("application/json");
             res.getWriter().write("{\"error\": \"Not authenticated. Please login.\"}");
         }
-        */
     }
 }

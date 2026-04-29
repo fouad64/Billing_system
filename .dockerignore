@@ -1,0 +1,31 @@
+# --- Standard Development Junk ---
+.git/
+.idea/
+.kilo/
+.m2/
+.settings/
+.mvn/
+node/
+node_dist/
+frontend/node_modules/
+target/generated-sources/
+target/maven-status/
+target/maven-archiver/
+*.log
+*.tmp
+
+# --- Build Artifacts ---
+# We ONLY want the final JAR, so we ignore everything else in target
+target/*
+!target/Telecom-Billing-Engine.jar
+
+# --- Backups (Safety First) ---
+backups/
+*.sql.bak
+*.pgdump
+# --- Environment & Secrets ---
+.env
+.env.*
+!.env.example
+db.properties
+src/main/resources/db.properties

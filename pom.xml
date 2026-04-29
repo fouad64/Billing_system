@@ -7,17 +7,19 @@
     <groupId>com.billing</groupId>
     <artifactId>Billing_system</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <packaging>war</packaging>
+    <packaging>jar</packaging>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jakarta.servlet.version>6.1.0</jakarta.servlet.version>
+        <tomcat.version>11.0.21</tomcat.version>
+        <jasper.version>7.0.1</jasper.version>
+        <jackson.version>2.17.0</jackson.version>
     </properties>
 
     <dependencies>
-        <!-- Tomcat 11 Servlet API -->
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
@@ -29,7 +31,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.5</version>
+            <version>42.7.7</version>
         </dependency>
 
         <!-- JSON Handling -->
@@ -39,30 +41,31 @@
             <version>2.12.1</version>
         </dependency>
 
+        <!-- JasperReports Stack -->
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports-pdf</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports-functions</artifactId>
-            <version>7.0.1</version>
+            <version>${jasper.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports-fonts</artifactId>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>net.sf.jasperreports</groupId>
             <artifactId>jasperreports-jdt</artifactId>
-            <version>7.0.1</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.xml.bind</groupId>
-            <artifactId>jakarta.xml.bind-api</artifactId>
-            <version>4.0.2</version>
+            <version>${jasper.version}</version>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jaxb</groupId>
@@ -70,19 +73,9 @@
             <version>4.0.5</version>
         </dependency>
         <dependency>
-            <groupId>net.sf.jasperreports</groupId>
-            <artifactId>jasperreports-fonts</artifactId>
-            <version>7.0.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.xmlgraphics</groupId>
-            <artifactId>batik-bridge</artifactId>
-            <version>1.17</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.xmlgraphics</groupId>
-            <artifactId>batik-svggen</artifactId>
-            <version>1.17</version>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+            <version>4.0.2</version>
         </dependency>
         <dependency>
             <groupId>com.github.librepdf</groupId>
@@ -90,19 +83,22 @@
             <version>2.0.3</version>
         </dependency>
 
-
-        <!-- Embedded Tomcat for Standalone Execution (Temporarily Disabled)
+        <!-- Embedded Tomcat for Standalone Execution -->
         <dependency>
             <groupId>org.apache.tomcat.embed</groupId>
             <artifactId>tomcat-embed-core</artifactId>
-            <version>11.0.0</version>
+            <version>${tomcat.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-jasper</artifactId>
-            <version>11.0.0</version>
+            <artifactId>tomcat-embed-el</artifactId>
+            <version>${tomcat.version}</version>
         </dependency>
-        -->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-websocket</artifactId>
+            <version>${tomcat.version}</version>
+        </dependency>
 
         <!-- HikariCP Connection Pool -->
         <dependency>
@@ -110,30 +106,82 @@
             <artifactId>HikariCP</artifactId>
             <version>6.2.1</version>
         </dependency>
+
+        <!-- Security Patch: Upgrade vulnerable transitive dependencies -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.17.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.17.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-xml</artifactId>
+            <version>2.17.1</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.18.0</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-beanutils</groupId>
+            <artifactId>commons-beanutils</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+
+        <!-- Logging Framework -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.12</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.3</version>
+        </dependency>
     </dependencies>
 
     <build>
-        <finalName>ROOT</finalName>
+        <finalName>Telecom-Billing-Engine</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/webapp</directory>
+                <targetPath>webapp</targetPath>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-war-plugin</artifactId>
-                <version>3.4.0</version>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                </configuration>
             </plugin>
 
-            <!-- 2. AUTOMATION: Build SvelteKit Frontend Automatically -->
             <plugin>
                 <groupId>com.github.eirslett</groupId>
                 <artifactId>frontend-maven-plugin</artifactId>
                 <version>1.15.0</version>
                 <configuration>
-                    <installDirectory>${project.basedir}</installDirectory>
+                    <installDirectory>node_dist</installDirectory>
                 </configuration>
                 <executions>
                     <execution>
                         <id>install-node-and-npm</id>
                         <goals><goal>install-node-and-npm</goal></goals>
-                        <phase>package</phase>
+                        <phase>generate-resources</phase>
                         <configuration>
                             <nodeVersion>v20.11.0</nodeVersion>
                         </configuration>
@@ -141,7 +189,7 @@
                     <execution>
                         <id>npm-install</id>
                         <goals><goal>npm</goal></goals>
-                        <phase>package</phase>
+                        <phase>generate-resources</phase>
                         <configuration>
                             <workingDirectory>frontend</workingDirectory>
                             <arguments>install</arguments>
@@ -150,7 +198,7 @@
                     <execution>
                         <id>npm-build</id>
                         <goals><goal>npm</goal></goals>
-                        <phase>package</phase>
+                        <phase>generate-resources</phase>
                         <configuration>
                             <workingDirectory>frontend</workingDirectory>
                             <arguments>run build</arguments>
@@ -158,33 +206,23 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <!-- Cargo: Professional Tomcat Runner -->
             <plugin>
-                <groupId>org.codehaus.cargo</groupId>
-                <artifactId>cargo-maven3-plugin</artifactId>
-                <version>1.10.13</version>
-                <configuration>
-                    <container>
-                        <containerId>tomcat11x</containerId>
-                        <artifactInstaller>
-                            <groupId>org.apache.tomcat</groupId>
-                            <artifactId>tomcat</artifactId>
-                            <version>11.0.0</version>
-                            <type>zip</type>
-                        </artifactInstaller>
-                    </container>
-                    <configuration>
-                        <type>standalone</type>
-                        <home>${project.build.directory}/tomcat11</home>
-                        <properties>
-                            <cargo.servlet.port>8080</cargo.servlet.port>
-                        </properties>
-                    </configuration>
-                </configuration>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>package</phase>
+                        <goals><goal>copy-dependencies</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
-            <!-- Maven Shade Plugin (Creates the Fat JAR) (Temporarily Disabled)
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -197,14 +235,18 @@
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.billing.BillingApplication</mainClass>
+                                    <mainClass>com.billing.Main</mainClass>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.billing:Billing_system</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-            -->
         </plugins>
     </build>
 </project>

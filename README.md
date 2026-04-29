@@ -1,189 +1,448 @@
-# Telecom Billing System 🚀
+# 📱 Telecom Billing System
 
-A modular Telecom Billing System built with a Java-based backend and a reactive frontend.
+<p align="center">
+  <a href="#">
+    <img src="https://img.shields.io/badge/Version-2.0-blueviolet?style=for-the-badge&logo=version" alt="Version">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk" alt="Java">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/SvelteKit-5.x-FF3E00?style=for-the-badge&logo=svelte" alt="SvelteKit">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/NeonDB-Cloud-9B59B6?style=for-the-badge&logo=cloud" alt="NeonDB">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=for-the-badge" alt="Status">
+  </a>
+</p>
+
+> A modular, production-ready Telecom Billing System built with Java 21 (Jakarta EE 11) backend and SvelteKit 5.x reactive frontend. Features real-time billing, CDR processing, PDF invoicing, and comprehensive admin controls.
+
+---
+
+## 📋 Table of Contents
+
+- [Architecture Stack](#-architecture-stack)
+- [Deployment](#-deployment)
+- [Key Features](#-key-features)
+- [Quick Start](#-quick-start)
+- [Technical Stack](#-technical-stack)
+- [Database Schema](#-database-schema)
+- [API Reference](#-api-reference)
+- [Security](#-security)
+- [Roadmap](#-roadmap)
 
 ---
 
 ## 🏗️ Architecture Stack
-- **Backend**: Java (Jakarta EE 11) on Apache Tomcat 11.
-- **Frontend**: SvelteKit 5 (Static Adapter) featuring an **AMOLED Obsidian** dark-mode interface.
-- **Database**: PostgreSQL (**Neon DB**) with HikariCP connection pooling.
-- **Reporting**: **JasperReports 7.0.1** (element kind schema) for PDF invoice generation.
-- **Security**: Unified `AppFilter` for session management and path normalization.
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                    SYSTEM ARCHITECTURE                         │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│   ┌──────────┐     ┌──────────────┐     ┌───────────┐         │
+│   │ SvelteKit│ ←── │  Tomcat 11   │ ←── │  Java 21  │         │
+│   │   5.x    │     │ Embedded     │     │  Backend  │         │
+│   └──────────┘     └──────────────┘     └───────────┘         │
+│        ↓                                        ↓              │
+│   ┌──────────────────────────────────────────────────┐        │
+│   │             HikariCP Connection Pool              │        │
+│   └──────────────────────────────────────────────────┘        │
+│        ↓                                                     │
+│   ┌──────────────────────────────────────────────────┐        │
+│   │                  NeonDB Cloud                     │        │
+│   └──────────────────────────────────────────────────┘        │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### Layer Details
+
+| Layer | Technology | Version | Purpose |
+|:------:|:----------|:--------:|:--------|
+| 💻 **Backend** | Java | 21 | Core language |
+| 🌐 **Framework** | Jakarta EE | 11 | Enterprise APIs |
+| 🖥️ **Server** | Tomcat | 11.0.21 | Embedded servlet |
+| 🗄️ **Database** | NeonDB | 3.x | Cloud PostgreSQL |
+| 🔄 **Pool** | HikariCP | 6.2.1 | Connection pooling |
+| 📄 **JSON** | Jackson | 2.17.0 | JSON processing |
+| 📊 **Reports** | JasperReports | 7.0.1 | PDF invoices |
+| 🎨 **Frontend** | SvelteKit | 5.x | Reactive UI |
+| ✨ **Styling** | Tailwind CSS | 4.0.0 | Dark mode UI |
+
+---
+
+## 🚂 Deployment
+
+### Railway Deployment
+
+The app is configured for seamless deployment on **Railway** with automatic health checks and environment variable support.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 RAILWAY SETUP                                    │
+├─────────────────────────────────────────────────────────────────┤
+│  🚂 Platform          │  Railway (railway.app)                 │
+│  🌐 Database         │  NeonDB (your project)                │
+│  🔌 Connection       │  JDBC with SSL required                │
+│  ❤️ Health Check     │  GET /health                          │
+│  📦 Build            │  Docker multi-stage build             │
+│  🔄 Deploy           │  Automatic on git push              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Environment Variables
+
+| Variable | Description | Example |
+|:---------|:------------|:--------|
+| `DB_URL` | NeonDB JDBC URL | `jdbc:postgresql://your-endpoint.neondb?sslmode=require` |
+| `DB_USER` | Database user | (from NeonDB dashboard) |
+| `DB_PASSWORD` | Database password | (from NeonDB dashboard) |
+| `CDR_INPUT_PATH` | Input directory | `/app/input` |
+| `CDR_PROCESSED_PATH` | Processed directory | `/app/processed` |
+
+### Railway Health Check
+
+```bash
+# Health endpoint (used for deployment detection)
+GET https://your-app.railway.app/health
+
+# Response:
+# {"status":"UP","timestamp":"2026-04-30T12:00:00Z"}
+```
+
+### Deploy to Railway
+
+```bash
+# 1. Install Railway CLI
+npm i -g @railway/cli
+
+# 2. Login
+railway login
+
+# 3. Init project
+railway init
+
+# 4. Set environment variables (from NeonDB dashboard)
+railway variables set DB_URL="jdbc:postgresql://..."
+railway variables set DB_USER="..."
+railway variables set DB_PASSWORD="..."
+
+# 5. Deploy
+railway deploy
+
+# Or connect GitHub repo for auto-deploy:
+# https://railway.app/new
+```
+
+### Docker Configuration
+
+```dockerfile
+# Multi-stage build for Railway
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /build
+
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+COPY . .
+RUN mvn package -DskipTests -B
+
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+
+# Security: Run as non-root user
+RUN addgroup --system javauser && adduser --system --ingroup javauser javauser
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Create directories
+RUN mkdir -p /app/input /app/processed && chown -R javauser:javauser /app
+
+# Copy artifacts
+COPY --from=build /build/target/Telecom-Billing-Engine.jar app.jar
+COPY --from=build /build/target/lib ./lib
+COPY --from=build /build/src/main/webapp ./webapp_static
+COPY --from=build /build/src/main/resources/invoice.jrxml .
+COPY --from=build /build/src/main/resources/logo.svg .
+COPY --from=build /build/src/main/resources/Pictures ./Pictures
+
+# Set ownership
+RUN chown -R javauser:javauser /app
+
+# Switch to non-root user
+USER javauser
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+# Run command
+ENTRYPOINT ["java", "-Xmx1g", "-Djava.awt.headless=true", "-cp", "app.jar:lib/*", "com.billing.Main"]
+```
 
 ---
 
 ## ✨ Key Features
-- **Administrative Control Panel**: A central dashboard for managing the telecom lifecycle: Customers, Contracts, Service Packages, and Rateplans.
-- **CDR Engine**: A Java-based parser (`CDRParser`) that validates, rates, and transforms raw CSV data into financial records.
-- **Jasper 7 Invoicing**: PDF generation using the **7.0.1 element-kind schema**, featuring custom SVG iconography.
-- **Automated Billing**: Server-side logic for 10% tax calculation, recurring service assignment, and one-time fee processing.
-- **SPA Path Resilience**: A robust `AppFilter` that manages path normalization for SvelteKit client-side routing within a Jakarta EE container.
-- **Unified Security Model**: Multi-layered authentication with session-based enforcement and HTTP-only cookie security.
-- **Cloud Database (NeonDB)**: Distributed PostgreSQL architecture with **HikariCP** for connection pooling.
+
+### 👑 Admin Features
+
+| Feature | Endpoint | Description |
+|:--------|:---------|:------------|
+| 📊 **Dashboard** | `/admin` | Real-time stats & metrics |
+| 👥 **Customers** | `/admin/customers` | Full customer CRUD |
+| 📄 **Contracts** | `/admin/contracts` | Contract management |
+| 💰 **Billing** | `/admin/bills` | Bill generation & payment |
+| 📈 **CDR** | `/admin/cdr` | CDR upload & viewing |
+| 📦 **Packages** | `/admin/service-packages` | Service packages |
+| 📵 **Rate Plans** | `/admin/rateplans` | Tariff plans |
+| 🔍 **Audit** | `/admin/audit` | Missing bill detection |
+
+### 👤 Customer Features
+
+| Feature | Endpoint | Description |
+|:--------|:---------|:------------|
+| 👤 **Profile** | `/profile` | View & edit profile |
+| 📱 **Contracts** | `/profile/contracts` | My contracts |
+| 📄 **Invoices** | `/profile/invoices` | Invoice history |
+| 📥 **Download** | `/profile/invoices/download` | PDF downloads |
+| 🛒 **Add-ons** | `/customer/addons` | Purchase add-ons |
+| 📝 **Register** | `/register` | Self-registration |
+
+### ⚙️ Backend Features
+
+| Feature | Description |
+|:--------|:------------|
+| 🗂️ **CDR Engine** | Java CSV parser for call records |
+| 🧪 **CDR Generator** | Test data generation |
+| 📄 **Jasper 7** | PDF with element-kind schema |
+| 🤖 **Automation** | Server-side billing (14% tax) |
+| ❤️ **Health** | Railway-compatible `/health` endpoint |
 
 ---
 
-## 🚀 Deployment & Execution
+## 🚀 Quick Start
 
-### Prerequisites
-- Java 21+
-- Maven 3.9+
-- Node.js 20+
+### Development (IDE)
 
-### Primary Execution Command
-The project utilizes the Maven Cargo plugin for a seamless deployment experience:
 ```bash
-./mvnw clean package cargo:run
+# 1. Configure secrets
+cp .env.example .env
+
+# 2. Edit .env with your NeonDB credentials
+# DB_URL=jdbc:postgresql://your-endpoint.neondb?sslmode=require
+# DB_USER=your_username
+# DB_PASSWORD=your_password
+
+# 3. Run in IntelliJ
+#    File → Project Structure → Run Configurations
+#    Select Main class → Environment → .env file
+
+# 4. Run
+com.billing.Main
 ```
-*Access the application at: http://localhost:8080*
 
-### Standard Administrative Credentials
-- **Username**: `admin`
-- **Password**: `admin123`
+### Production (Railway)
 
-## 🔄 System Core & Data Flow
-
-Understanding the lifecycle of a transaction in FMRZ:
-
-1.  **Ingestion Phase**: Raw CDR (Call Detail Record) files are placed in the `input/` directory.
-2.  **Rating Phase**: The `AdminCDRServlet` triggers the `CDRParser`. The system identifies the `MSISDN`, lookups the active `RatePlan`, and calculates costs for Voice (Mins), Data (GB), and SMS.
-3.  **Persistence Phase**: Rated records are committed to the `cdr` table in NeonDB, and the raw file is archived to `processed/`.
-4.  **Billing Cycle**: The system aggregates rated CDRs, applies `Recurring Services` (from `contract_service`), adds `One-time Fees`, and calculates a **10% Government Tax** on the subtotal.
-5.  **Rendering Phase**: When a user requests an invoice, the `CustomerProfileServlet` passes the `BILL_ID` to the Jasper engine. The `invoice.jrxml` template is populated via a direct JDBC sub-query and rendered into a PDF document.
-
-## 🧱 Core Component Breakdown
-
-### 🟢 Backend (The Engine)
-- **`com.billing.servlet.*`**: The API layer. Each servlet is specialized for a resource (e.g., `AdminUserServlet` for identity, `AdminBillServlet` for finance).
-- **`com.billing.filter.AppFilter`**: The "Traffic Controller". It intercepts all requests to handle path normalization—this allows SvelteKit's deep links (like `/profile/invoices`) to work without triggering a Tomcat 404.
-- **`com.billing.db.DB`**: A thread-safe Singleton managing the HikariCP pool. It ensures the application can handle hundreds of concurrent database connections to NeonDB efficiently.
-
-### 🔴 Frontend Implementation
-- **Design Philosophy**: Built on an "Obsidian Dark" foundation (`#000000`) with high-contrast crimson accents (`#E00800`).
-- **SvelteKit 5**: Utilizes Svelte components for reactive updates in the Admin dashboard.
-- **Static Integration**: The frontend is pre-built and served as optimized static assets from `src/main/webapp`, allowing for zero-overhead delivery by Tomcat.
-
-### 📊 Database Schema & Financial Integrity
-- **`user_account`**: Identity provider with hashed credentials and role-based permissions (`admin` vs `customer`).
-- **`contract`**: The central pivot point. Holds `msisdn`, links to `rateplan`, and tracks `billing_cycle` status.
-- **`bill`**: Immutable financial snapshots. Each record stores the exact state of usage at the time of generation, including the **10% tax** stamp.
-- **`cdr`**: Raw event logs. Includes `source_msisdn`, `destination_msisdn`, `duration`, and `cost`.
-
----
-
-## 📡 API Architecture & Endpoints
-
-The system exposes a unified REST-like API via Jakarta Servlets. Each endpoint is protected by the `AuthFilter`.
-
-### 🛡️ Administrative Endpoints (`/api/admin/*`)
-- **`/customers`**: Full CRUD for user accounts.
-- **`/contracts`**: Management of MSISDN assignments and rateplan links.
-- **`/cdr/rate`**: The entry point for the **Rating Engine**. Ingests CSV data and performs real-time cost calculation.
-- **`/billing/generate`**: Triggers the end-of-month aggregation and PDF invoice creation.
-- **`/stats`**: Provides high-performance aggregation for the dashboard charts.
-
-### 👤 Customer Endpoints (`/api/customer/*`)
-- **`/profile`**: Retrieves account details and active service packages.
-- **`/invoices`**: Lists historical billing records with secure ownership verification.
-- **`/invoices/download`**: Streams the Jasper-rendered PDF with `Content-Disposition: attachment`.
-
----
-
-## 🔒 Security & Path Engineering
-
-### 1. The `AppFilter` (SPA Routing Fix)
-In a standard Tomcat setup, navigating directly to a SvelteKit route like `/profile/invoices` would cause a 404. Our `AppFilter` detects if a request is for a frontend route (vs an API or static file) and transparently serves `index.html`. This enables **true SPA capability** within a legacy Java container.
-
-### 2. Multi-Layered Authentication
-1. **Filter Level**: `AuthFilter` checks session existence before any servlet logic executes.
-2. **Role Level**: Servlets verify the `role` attribute to prevent customers from accessing administrative billing triggers.
-3. **Data Level**: Invoices are queried using both `BILL_ID` and `USER_ID` to prevent ID-enumeration attacks.
-
----
-
-## 🛠️ Interface Design
-The interface is optimized for dark-mode environments:
-- **Static Tables**: Custom CSS overrides (`.card-static`) to ensure data remains stationary.
-- **Iconography**: Optimized, stroke-based SVGs (`voice.svg`, `data.svg`, `sms.svg`) ensure a consistent look across the web and PDF.
-- **Visual Depth**: Uses `backdrop-filter: blur(25px)` to provide depth without distracting from the data.
-
----
-
-## 🔧 Troubleshooting & Common Issues
-
-### 1. Frontend Changes Not Appearing
-**Issue**: You edited a Svelte file but the browser shows the old version.
-**Fix**: SvelteKit must be recompiled into static assets. Run:
 ```bash
-npm run build --prefix frontend
-```
-Then, perform a **Hard Refresh** (`Ctrl + F5`) in your browser to bypass the cache.
+# Option 1: Deploy via GitHub (recommended)
+# 1. Push code to GitHub
+# 2. Create project at railway.app
+# 3. Connect GitHub repository
+# 4. Add environment variables in Railway dashboard
+# 5. Deploy automatically on push
 
-### 2. Jasper Font/Image Errors
-**Issue**: PDF generation fails or icons are missing in the invoice.
-**Fix**: JasperReports 7 is strict about resource paths. Ensure ` Pictures/` is inside `src/main/resources` and your `jasperreports.properties` is correctly pointing to the classpath.
-
-### 3. NeonDB Connection Timeouts
-**Issue**: "Connection refused" or slow queries.
-**Fix**: Ensure your IP is whitelisted in the Neon Console. The system uses **HikariCP** to maintain warm connections; check `DB.java` to adjust `maximumPoolSize` if under heavy load.
-
----
-
-## 📂 Project Structure
-
-```text
-├── frontend/               # SvelteKit 5 source code (UI/UX)
-│   ├── src/routes/         # App pages (Dashboard, Invoices, Login)
-│   └── svelte.config.js    # Adapter-static config for Tomcat deployment
-├── src/main/java/          # Backend Java source (Jakarta EE)
-│   └── com/billing/
-│       ├── servlet/        # API Endpoints (Billing, Customer, Profile)
-│       ├── model/          # POJOs (Bill, Contract, CDR, Invoice)
-│       ├── db/             # NeonDB Connection Management (HikariCP)
-│       ├── filter/         # Security & Path Normalization logic
-│       └── cdr/            # CDR Ingestion & Rating Engine
-├── src/main/resources/     # Resource Assets
-│   ├── invoice.jrxml       # JasperReports 7.0.1 Invoice Template
-│   ├── Pictures/           # SVG icons and logos
-│   └── jasperreports.prop  # Reporting engine configuration
-├── src/main/webapp/        # Compiled frontend assets (SvelteKit output)
-├── whole_billing.sql       # Database schema & NeonDB initialization
-└── pom.xml                 # Maven build & Dependency management
+# Option 2: Deploy via CLI
+railway init
+railway deploy
 ```
 
-## 🛠️ Development & Database
-- **NeonDB Integration**: The system connects to a PostgreSQL instance on Neon. Ensure your environment variables or `DB.java` are updated with the correct `DSN`.
-- **Billing Logic**: Tax is calculated at a fixed **10%** rate as per pre-production requirements, handled via PostgreSQL triggers and Jasper expressions.
-- **Iconography**: The project uses a custom set of Lucide-style **Red Accent SVGs** for a clean, consistent look across the web and PDF.
+### Production (Local Container)
+
+```bash
+# Build the JAR
+./mvnw clean package -DskipTests
+
+# Launch with Podman/Docker
+podman-compose up -d --build
+
+# Verify health
+curl http://localhost:8080/health
+```
 
 ---
 
-## 🧪 Operational Validation (CDR Rating Pipeline)
+## 🗄️ Database Schema
 
-To verify the integrity of the call detail record (CDR) rating and billing lifecycle:
+### NeonDB Configuration
 
-### 1. Provision a Test Contract
-1. Authenticate as an **Administrator**.
-2. Navigate to **Customers** -> **Add Customer**.
-3. Navigate to **Contracts** -> **Add Contract** for the newly created customer.
-4. Record the **MSISDN** (Phone Number) assigned to the contract (e.g., `01011223344`).
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  NEONDB CONFIGURATION                            │
+├─────────────────────────────────────────────────────────────────┤
+│  🌐 Service          │  NeonDB Cloud                           │
+│  📍 Endpoint        │  (your-project-name)                   │
+│  📂 Database        │  neondb                               │
+│  🔒 SSL             │  Required (sslmode=require)            │
+│  🔄 Pooling         │  HikariCP with 10 connections          │
+│  💾 Type            │  PostgreSQL compatible               │
+└──────��─��────────────────────────────────────────────────────────┘
+```
 
-### 2. Prepare Mock CDR Data (CSV)
-1. Edit any `.csv` file within the `input/` directory.
-2. Insert a record utilizing the previously recorded MSISDN:
-   `FILE_ID, 01011223344, 0123456789, 2026-04-24 10:00:00, 120, 1, VOICE, LOCAL, 0.0`
+### 14 Tables
 
-### 3. Execute the Rating Engine
-1. From the Administrative Dashboard, access the **Call Explorer**.
-2. Select **"Import & Rate New CDRs"**.
-3. The system will ingest the file, move it to the `processed/` directory, and calculate the cost based on the active rate plan.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      CORE TABLES                                │
+├─────────────────────────────────────────────────────────────────┤
+│  user_account          │  Customers & administrators         │
+│  rateplan            │  Tariff plans                        │
+│  service_package    │  Bundled services                   │
+│  rateplan_service_package │  Rateplan ↔ Package links       │
+│  contract           │  Customer contracts                 │
+│  contract_consumption│  Usage tracking                    │
+│  ror_contract       │  Applied rates                      │
+│  bill               │  Billing invoices                  │
+│  invoice            │  PDF records                      │
+│  cdr                │  Call detail records               │
+│  file               │  CDR file tracking                │
+│  rejected_cdr       │  Rejected records                 │
+│  contract_addon     │  Customer add-ons                 │
+│  msisdn_pool        │  Phone number pool                │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### 4. Data Verification
-- **Administrative View**: Confirm the record appears in the **Call Explorer** with the calculated cost and 'Rated' status.
-- **Customer View**: Authenticate as the customer to verify updated billing totals and invoice accessibility.
+### 60+ Functions
+
+```sql
+-- Core Billing
+SELECT generate_bill(1, '2026-04-01');
+SELECT generate_all_bills('2026-04-01');
+
+-- Contract Management
+SELECT create_contract(1, 2, '201000000001', 500);
+SELECT change_contract_status(1, 'suspended');
+SELECT change_contract_rateplan(1, 2);
+
+-- Customer
+SELECT login('username', 'password');
+SELECT get_all_customers('search', 50, 0);
+
+-- Add-ons
+SELECT purchase_addon(1, 3);
+SELECT get_contract_addons(1);
+```
+
+### 3 Triggers
+
+| Trigger | Event | Action |
+|:--------|:------|:-------|
+| `trg_auto_rate_cdr` | AFTER INSERT | Auto-rate CDR |
+| `trg_auto_initialize_consumption` | BEFORE INSERT | Init period |
+| `trg_bill_payment` | AFTER UPDATE | Restore credit |
 
 ---
 
-**Last Updated:** April 2026
-**Release Status:** Production Stable
+## 🔌 API Reference
+
+### Public Endpoints
+
+| Method | Endpoint | Description |
+|:------:|:---------|:------------|
+| 🟢 GET | `/health` | Health check |
+
+### Authentication
+
+| Method | Endpoint | Description |
+|:------:|:---------|:------------|
+| ⚡ POST | `/api/auth/login` | User login |
+| ⚡ POST | `/api/auth/register` | New customer |
+| ⚡ POST | `/api/auth/logout` | User logout |
+| 🟢 GET | `/api/auth/verify` | Verify session |
+
+### Customer
+
+| Method | Endpoint | Description |
+|:------:|:---------|:------------|
+| 🟢 GET | `/api/customer/profile` | Get profile |
+| 🟡 PUT | `/api/customer/profile` | Update profile |
+| 🟢 GET | `/api/customer/contracts` | My contracts |
+| 🟢 GET | `/api/customer/invoices` | My invoices |
+| 🟢 GET | `/api/customer/invoices/download` | Download PDF |
+| 🟢 GET | `/api/customer/addons` | My add-ons |
+| ⚡ POST | `/api/customer/addons` | Purchase add-on |
+| 🟢 GET | `/api/onboarding/available-msisdn` | Phone numbers |
+| ⚡ POST | `/api/onboarding/create-contract` | New contract |
+
+### Admin
+
+| Method | Endpoint | Description |
+|:------:|:---------|:------------|
+| 🟢 GET | `/api/admin/customers` | List customers |
+| ⚡ POST | `/api/admin/customers` | Create customer |
+| 🟢 GET | `/api/admin/customers/*` | Get customer |
+| 🟡 PUT | `/api/admin/customers/*` | Update customer |
+| 🔴 DELETE | `/api/admin/customers/*` | Delete customer |
+| 🟢 GET | `/api/admin/contracts` | List contracts |
+| ⚡ POST | `/api/admin/contracts` | Create contract |
+| 🟡 PUT | `/api/admin/contracts/*/status` | Change status |
+| 🟡 PUT | `/api/admin/contracts/*/rateplan` | Change rateplan |
+| 🟢 GET | `/api/admin/cdr` | List CDRs |
+| ⚡ POST | `/api/admin/cdr/upload` | Upload CDR |
+| ⚡ POST | `/api/admin/cdr/generate` | Generate test |
+| 🟢 GET | `/api/admin/bills` | List bills |
+| ⚡ POST | `/api/admin/bills/*/pay` | Pay bill |
+| ⚡ POST | `/api/admin/bills/generate-all` | Generate all |
+| 🟢 GET | `/api/admin/stats` | Dashboard stats |
+| 🟢 GET | `/api/admin/audit/missing` | Missing bills |
+
+---
+
+## 🛡️ Security Audit
+
+| Component | Status | Description |
+|:---------|:------:|:------------|
+| 🔐 **Identity** | ✅ | Non-root `javauser` |
+| 🔒 **Secrets** | ✅ | Environment variable priority |
+| 📊 **Observability** | ✅ | `/health` endpoint |
+| 🔧 **Build** | ✅ | LICENSE/NOTICE merge |
+| 📄 **Reporting** | ✅ | JIT caching |
+| 🌐 **Assets** | ✅ | Container-native |
+| 🔀 **Routing** | ✅ | SPA normalization |
+| 🎨 **Frontend** | ✅ | State fixes |
+| 💳 **Billing** | ✅ | Idempotent upsert |
+| 🚂 **Railway** | ✅ | Auto-deploy ready |
+
+---
+
+## 🗺️ Roadmap
+
+### Phase 3: Advanced Auditability
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  CARRIER-GRADE FEATURES                    │
+├─────────────────────────────────────────────────────────────┤
+│  cdr_rating_detail    │  Per-bundle consumption audit    │
+│  Multi-Bucket       │  Split across rating events  │
+│  Itemized Logs      │  Millisecond-accurate trail│
+│  Dual Rating       │  Wholesale & retail rates │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+<div align="center">
+
+### 📱 FMRZ Telecom Group
+
+**Version 2.0** | **April 2026** | **Production Ready** 🏎️🛡️🚀
+
+</div>
