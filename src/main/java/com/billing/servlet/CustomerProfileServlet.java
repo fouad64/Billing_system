@@ -22,7 +22,7 @@ public class CustomerProfileServlet extends BaseServlet {
         try (InputStream is = CustomerProfileServlet.class.getResourceAsStream("/config.properties")) {
             if (is != null) config.load(is);
         } catch (IOException e) {
-            System.err.println("WARNING: Could not load config.properties");
+            logger.warn("WARNING: Could not load config.properties");
         }
     }
 
@@ -120,15 +120,13 @@ public class CustomerProfileServlet extends BaseServlet {
                 sendError(res, 404, "Unknown customer endpoint: " + path);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            logger.error("API Logic Error in CustomerProfileServlet", e);
             try {
                 if (!res.isCommitted()) {
                     res.reset();
-                    sendError(res, 500, "Jasper Error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                    sendError(res, 500, "Server Error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
                 }
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
+            } catch (IOException ignored) {}
         }
     }
 }

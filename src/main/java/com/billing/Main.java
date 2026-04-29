@@ -114,7 +114,7 @@ public class Main {
                 tomcat.stop();
                 logger.info("SHUTDOWN: System stopped gracefully.");
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("Error during graceful shutdown", e);
             }
         }));
 

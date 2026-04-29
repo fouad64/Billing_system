@@ -52,9 +52,7 @@ public class AuthServlet extends BaseServlet {
             session.setAttribute("user", user);
             sendJson(res, user);
         } catch (Exception e) {
-            e.printStackTrace();  // Log to server console
-            System.err.println("Login error for user: " + username);
-            System.err.println("Error details: " + e.getMessage());
+            logger.error("Login error for user: {}", username, e);
             sendError(res, 500, "Authentication error: " + e.getMessage());
         }
     }
