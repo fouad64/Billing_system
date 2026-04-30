@@ -95,7 +95,7 @@ public class CustomerProfileServlet extends BaseServlet {
                         params.put("BILL_ID", billId);
                         
                         // Logo handling
-                        InputStream logoStream = JasperLoader.getResourceStream("red-logo.png");
+                        InputStream logoStream = JasperLoader.getResourceStream("logo.png");
                         if (logoStream != null) {
                             params.put("LOGO_PATH", logoStream);
                         }

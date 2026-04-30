@@ -315,16 +315,16 @@
 			<element kind="textField" x="420" y="40" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{recurring_fees} + " EGP"]]></expression>
 			</element>
-			<element kind="staticText" x="30" y="60" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
+			<element kind="staticText" x="30" y="65" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
 				<text><![CDATA[Domestic Overage]]></text>
 			</element>
-			<element kind="textField" x="420" y="60" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="65" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{overage_charge} + " EGP"]]></expression>
 			</element>
-			<element kind="staticText" x="30" y="80" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
+			<element kind="staticText" x="30" y="90" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
 				<text><![CDATA[Roaming Charges]]></text>
 			</element>
-			<element kind="textField" x="420" y="80" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="90" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{roaming_charge} + " EGP"]]></expression>
 			</element>
 			<element kind="staticText" x="30" y="100" width="260" height="16" forecolor="#4CAF50" fontSize="10.0" bold="true">
@@ -355,8 +355,8 @@
 			<element kind="ellipse" x="28" y="182" width="40" height="40" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
-			<element kind="staticText" x="28" y="188" width="40" height="28" forecolor="#FFFFFF" fontSize="18.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
-				<text><![CDATA[E£]]></text>
+			<element kind="staticText" x="28" y="188" width="40" height="28" forecolor="#FFFFFF" fontSize="14.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+				<text><![CDATA[EGP]]></text>
 			</element>
 			<element kind="staticText" x="80" y="187" width="220" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" vTextAlign="Middle">
 				<text><![CDATA[TOTAL DUE]]></text>
