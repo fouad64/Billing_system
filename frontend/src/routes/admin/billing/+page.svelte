@@ -396,7 +396,7 @@
       </div>
       <div class="stat-info">
         <span class="stat-label">Total Revenue</span>
-        <span class="stat-value">{stats.revenue || 0} EGP</span>
+        <span class="stat-value">{stats.revenue || 0} E£</span>
       </div>
     </div>
     <div class="card stat-card info-card">
@@ -741,7 +741,7 @@
               </div>
             </div>
           </td>
-          <td><span class="amount-num bold">{b.total_amount} EGP</span></td>
+          <td><span class="amount-num bold">{b.total_amount} E£</span></td>
           <td>
             <span class="badge status-{b.status || 'issued'}">
               {b.status || 'issued'}

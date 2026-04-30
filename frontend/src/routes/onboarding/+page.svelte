@@ -131,7 +131,7 @@
                                 </div>
                             </div>
                             <div class="plan-price-box">
-                                <span class="currency">EGP</span>
+                                <span class="currency">E£</span>
                                 <span class="amount">{plan.price}</span>
                                 <span class="period">/mo</span>
                             </div>

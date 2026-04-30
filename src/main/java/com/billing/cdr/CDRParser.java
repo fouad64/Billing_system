@@ -171,7 +171,32 @@ public class CDRParser {
                             continue;
                         }
 
-                        // Normalize
+                        // Fetch dynamic configuration for smart correction
+                        int voiceId = getServiceId("Voice Pack");
+                        int dataId = getServiceId("Data Pack");
+                        int smsId = getServiceId("SMS Pack");
+                        
+                        String urlMarkers = DB.getProperty("cdr.url.markers");
+                        if (urlMarkers == null) urlMarkers = "://,.com,.net,.org,.gov";
+                        String[] markers = urlMarkers.split(",");
+
+                        // SMART CORRECTION: Detect "Data Leakage" where URLs are labeled as SMS
+                        if (serviceId == smsId && usage > 100) {
+                            String lowerDest = dialB.toLowerCase();
+                            boolean matches = false;
+                            for (String m : markers) if (lowerDest.contains(m.trim())) { matches = true; break; }
+                            if (matches) serviceId = dataId;
+                        }
+
+                        // SMART CORRECTION 2: Detect "SMS Leakage" where SMS are labeled as Data
+                        if (serviceId == dataId && usage == 1) {
+                            String lowerDest = dialB.toLowerCase();
+                            boolean isUrl = false;
+                            for (String m : markers) if (lowerDest.contains(m.trim())) { isUrl = true; break; }
+                            if (!isUrl) serviceId = smsId;
+                        }
+
+                        // Normalize MSISDNs
                         if (dialA.startsWith("00")) dialA = dialA.substring(2);
                         if (dialB.startsWith("00")) dialB = dialB.substring(2);
 
