@@ -240,7 +240,7 @@
     try {
       let url = '/api/admin/bills/pay-bulk';
       if (isGlobalSelection) {
-        url += `?global=true&search=${encodeURIComponent(billsSearch)}`;
+        url += `?global=truFMRZsearch=${encodeURIComponent(billsSearch)}`;
       } else {
         url += `?ids=${Array.from(selectedIds).join(',')}`;
       }
@@ -301,7 +301,7 @@
     try {
       if (isAuditGlobalSelection) {
         // Global Audit Generation
-        const res = await fetch(`/api/admin/bills/generate-bulk?global=true&search=${encodeURIComponent(missingSearch)}`, { 
+        const res = await fetch(`/api/admin/bills/generate-bulk?global=truFMRZsearch=${encodeURIComponent(missingSearch)}`, { 
             method: 'POST', 
             credentials: 'include' 
         });
