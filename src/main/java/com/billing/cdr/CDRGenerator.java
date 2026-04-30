@@ -64,6 +64,7 @@ public class CDRGenerator {
             int serviceId = (baseType == 0 ? 1 : (baseType == 1 ? 2 : 3));
             if (isRoaming) serviceId += 4; 
 
+            String dialB;
             long duration;
 
             if (baseType == 0) { // Voice

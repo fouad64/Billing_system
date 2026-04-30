@@ -145,6 +145,9 @@ public class CDRParser {
                         dialA = p[1].trim();
                         dialB = p[2].trim();
                         timeStr = p[3].trim(); 
+                        serviceId = Integer.parseInt(p[5].trim());
+                        double rawUsage = Double.parseDouble(p[4].trim());
+                        
                         // Store RAW units (Seconds for Voice, Bytes for Data, Units for SMS)
                         // The database columns are now BIGINT to handle large byte counts.
                         usage = (long) rawUsage;
