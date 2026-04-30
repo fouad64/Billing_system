@@ -299,14 +299,14 @@
 			</element>
 		</band>
 		<!-- BAND 4: FINANCIAL SUMMARY -->
-		<band height="235">
+		<band height="280">
 			<element kind="ellipse" x="10" y="10" width="8" height="8" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
 			<element kind="staticText" x="24" y="8" width="260" height="18" forecolor="#FF0000" fontSize="12.0" bold="true">
 				<text><![CDATA[FINANCIAL SUMMARY (INC. TAXES)]]></text>
 			</element>
-			<element kind="rectangle" x="10" y="32" width="535" height="135" backcolor="#121212" radius="10" mode="Opaque">
+			<element kind="rectangle" x="10" y="32" width="535" height="160" backcolor="#121212" radius="10" mode="Opaque">
 				<pen lineWidth="0.5" lineColor="#333333"/>
 			</element>
 			<element kind="staticText" x="30" y="40" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
@@ -346,22 +346,22 @@
 				<expression><![CDATA[$F{one_time_fees} ]]></expression>
 			</element>
  
-			<element kind="rectangle" x="10" y="175" width="535" height="55" backcolor="#1A1A1A" radius="10" mode="Opaque">
+			<element kind="rectangle" x="10" y="210" width="535" height="55" backcolor="#1A1A1A" radius="10" mode="Opaque">
 				<pen lineWidth="1.0" lineColor="#FF0000"/>
 			</element>
-			<element kind="rectangle" x="10" y="175" width="5" height="55" backcolor="#FF0000" mode="Opaque">
+			<element kind="rectangle" x="10" y="210" width="5" height="55" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
-			<element kind="ellipse" x="28" y="182" width="40" height="40" backcolor="#FF0000" mode="Opaque">
+			<element kind="ellipse" x="28" y="217" width="40" height="40" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
-			<element kind="staticText" x="28" y="188" width="40" height="28" forecolor="#FFFFFF" fontSize="14.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<element kind="staticText" x="28" y="223" width="40" height="28" forecolor="#FFFFFF" fontSize="14.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
 				<text><![CDATA[EGP]]></text>
 			</element>
-			<element kind="staticText" x="80" y="187" width="220" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" vTextAlign="Middle">
+			<element kind="staticText" x="80" y="222" width="220" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" vTextAlign="Middle">
 				<text><![CDATA[TOTAL DUE]]></text>
 			</element>
-			<element kind="textField" x="310" y="180" width="235" height="44" forecolor="#FF0000" fontSize="24.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
+			<element kind="textField" x="310" y="215" width="235" height="44" forecolor="#FF0000" fontSize="24.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
 				<expression><![CDATA[$F{total_amount} ]]></expression>
 			</element>
 		</band>
