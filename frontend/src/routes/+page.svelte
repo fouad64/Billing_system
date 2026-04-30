@@ -3,6 +3,7 @@
   let currentSlide = $state(0);
   let loggedIn = $state(false);
   let dashboardUrl = $state('/login');
+  let dashboardLabel = $state('Go to Profile');
 
   const features = [
     { 
@@ -32,7 +33,13 @@
     if (res.ok) {
       const user = await res.json();
       loggedIn = true;
-      dashboardUrl = user.role === 'admin' ? '/admin' : '/dashboard';
+      if (user.role === 'admin') {
+        dashboardUrl = '/admin';
+        dashboardLabel = 'Go to Dashboard';
+      } else {
+        dashboardUrl = '/profile';
+        dashboardLabel = 'Go to Profile';
+      }
     }
   });
 
@@ -61,7 +68,7 @@
       <div class="hero-actions">
         <a href="packages" class="btn btn-primary btn-lg">View Packages</a>
         {#if loggedIn}
-          <a href={dashboardUrl} class="btn btn-secondary btn-lg">Go to Dashboard</a>
+          <a href={dashboardUrl} class="btn btn-secondary btn-lg">{dashboardLabel}</a>
         {:else}
           <a href="register" class="btn btn-secondary btn-lg">Get Started</a>
         {/if}
@@ -121,7 +128,7 @@
       <div class="cta-actions">
         <a href="packages" class="btn btn-primary">Browse Packages</a>
         {#if loggedIn}
-          <a href={dashboardUrl} class="btn btn-secondary">Go to Dashboard</a>
+          <a href={dashboardUrl} class="btn btn-secondary">{dashboardLabel}</a>
         {:else}
           <a href="login" class="btn btn-secondary">Login</a>
         {/if}

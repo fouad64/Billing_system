@@ -17,10 +17,10 @@
 			COALESCE(b.voice_usage, 0) AS voice_usage,
 			COALESCE(b.data_usage, 0) AS data_usage,
 			COALESCE(b.sms_usage, 0) AS sms_usage,
-			COALESCE(b.ror_charge, 0) AS ror_charge,
+			COALESCE(b."ROR_charge", 0) AS ror_charge,
 			COALESCE(b.taxes, 0) AS taxes,
 			COALESCE(b.total_amount, 0) AS total_amount,
-			COALESCE(b.status::text, 'issued') AS bill_status,
+			COALESCE(b.status::varchar, 'issued') AS bill_status,
 			c.msisdn AS msisdn, rp.name AS rateplan_name
 		FROM bill b
 		JOIN contract c ON b.contract_id = c.id
