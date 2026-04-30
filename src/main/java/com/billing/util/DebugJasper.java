@@ -6,7 +6,8 @@ import java.io.FileInputStream;
 
 public class DebugJasper {
     public static void main(String[] args) {
-        String filePath = "/app/invoice.jrxml";
+        String fileName = (args.length > 0) ? args[0] : "invoice.jrxml";
+        String filePath = "/app/" + fileName;
         System.out.println("🚀 DEBUG: Attempting to compile " + filePath);
         
         File f = new File(filePath);
