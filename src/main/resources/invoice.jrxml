@@ -1,25 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jasperReport name="Invoice_FMRZ" language="java" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
-	<style name="Table_Header" mode="Opaque" backcolor="#1A1A1A" forecolor="#AAAAAA" fontSize="7.0"/>
-	<style name="Table_Cell" mode="Opaque" backcolor="#121212" forecolor="#FFFFFF" fontSize="7.0"/>
-	<dataset name="usageBreakdown">
-		<parameter name="BILL_ID" class="java.lang.Integer"/>
-		<query language="SQL"><![CDATA[
-			SELECT service_type, category_label, quota, consumed, unit_rate, line_total,
-				   is_roaming, is_promotional, notes
-			FROM get_bill_usage_breakdown($P{BILL_ID})
-			ORDER BY service_type, is_roaming DESC, category_label
-		]]></query>
-		<field name="service_type" class="java.lang.String"/>
-		<field name="category_label" class="java.lang.String"/>
-		<field name="quota" class="java.lang.Integer"/>
-		<field name="consumed" class="java.lang.Integer"/>
-		<field name="unit_rate" class="java.math.BigDecimal"/>
-		<field name="line_total" class="java.math.BigDecimal"/>
-		<field name="is_roaming" class="java.lang.Boolean"/>
-		<field name="is_promotional" class="java.lang.Boolean"/>
-		<field name="notes" class="java.lang.String"/>
-	</dataset>
+	
 	<parameter name="BILL_ID" class="java.lang.Integer"/>
 	<parameter name="LOGO_PATH" class="java.lang.Object"/>
 	<parameter name="GROUP_NAME" class="java.lang.String"/>
@@ -29,6 +10,7 @@
 	<parameter name="VOICE_ICON" class="java.lang.Object"/>
 	<parameter name="DATA_ICON" class="java.lang.Object"/>
 	<parameter name="SMS_ICON" class="java.lang.Object"/>
+	<parameter name="BILL_STATUS" class="java.lang.String"/>
 
 
 
@@ -47,7 +29,6 @@
 			COALESCE(b.promotional_discount, 0) AS promotional_discount,
 			COALESCE(b.taxes, 0) AS taxes,
 			COALESCE(b.total_amount, 0) AS total_amount,
-			COALESCE(b.status::text, 'issued') AS bill_status,
 			c.msisdn AS msisdn, rp.name AS rateplan_name
 		FROM bill b
 		JOIN contract c ON b.contract_id = c.id
@@ -70,12 +51,11 @@
 	<field name="sms_usage" class="java.lang.Integer"/>
 	<field name="overage_charge" class="java.math.BigDecimal"/>
 	<field name="roaming_charge" class="java.math.BigDecimal"/>
+	<field name="promotional_discount" class="java.math.BigDecimal"/>
 	<field name="taxes" class="java.math.BigDecimal"/>
 	<field name="total_amount" class="java.math.BigDecimal"/>
-	<field name="bill_status" class="java.lang.String"/>
 	<field name="msisdn" class="java.lang.String"/>
 	<field name="rateplan_name" class="java.lang.String"/>
-	<field name="promotional_discount" class="java.math.BigDecimal"/>
 
 	<background height="800">
 		<element kind="rectangle" x="0" y="0" width="555" height="800" backcolor="#0A0A0A" mode="Opaque">
@@ -161,7 +141,7 @@
 				<pen lineWidth="1.5" lineColor="#FF0000"/>
 			</element>
 			<element kind="textField" x="350" y="106" width="140" height="22" forecolor="#FFFFFF" fontSize="13.0" bold="true" hTextAlign="Center" blankWhenNull="true">
-				<expression><![CDATA[$F{bill_status}.toUpperCase()]]></expression>
+				<expression><![CDATA[$P{BILL_STATUS}.toUpperCase()]]></expression>
 			</element>
 		</band>
 
@@ -202,98 +182,97 @@
 		</band>
 
 		<!-- BAND 3: DETAILED USAGE TABLE -->
-		<band height="110" splitType="Stretch">
+		<band height="130" splitType="Stretch">
 			<element kind="ellipse" x="10" y="10" width="8" height="8" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
 			<element kind="staticText" x="24" y="8" width="260" height="18" forecolor="#FF0000" fontSize="12.0" bold="true">
 				<text><![CDATA[DETAILED USAGE BREAKDOWN]]></text>
 			</element>
-			<element kind="rectangle" x="10" y="32" width="535" height="75" backcolor="#121212" radius="10" mode="Opaque">
+			
+			<element kind="rectangle" x="10" y="32" width="535" height="88" backcolor="#121212" radius="10" mode="Opaque">
 				<pen lineWidth="0.5" lineColor="#333333"/>
 			</element>
-			<element kind="component" x="10" y="32" width="535" height="75">
-				<component kind="table">
-					<datasetRun uuid="c3d4e5f6-a7b8-9012-abcd-ef3456789012" subDataset="usageBreakdown">
-						<parameter name="BILL_ID">
-							<expression><![CDATA[$P{BILL_ID}]]></expression>
-						</parameter>
-					</datasetRun>
-					<column kind="single" width="140">
-						<columnHeader style="Table_Header" height="22">
-							<element kind="staticText" x="5" y="0" width="130" height="22" forecolor="#AAAAAA" fontSize="8.0" bold="true" vTextAlign="Middle">
-								<text><![CDATA[Service]]></text>
-							</element>
-						</columnHeader>
-						<detailCell style="Table_Cell" height="15">
-							<element kind="textField" x="5" y="0" width="130" height="15" forecolor="#FFFFFF" fontSize="8.0" vTextAlign="Middle">
-								<expression><![CDATA[$F{category_label}]]></expression>
-							</element>
-						</detailCell>
-					</column>
-					<column kind="single" width="70">
-						<columnHeader style="Table_Header" height="22">
-							<element kind="staticText" x="0" y="0" width="70" height="22" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
-								<text><![CDATA[Quota]]></text>
-							</element>
-						</columnHeader>
-						<detailCell style="Table_Cell" height="15">
-							<element kind="textField" x="0" y="0" width="70" height="15" forecolor="#E0E0E0" fontSize="8.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[$F{quota} == null ? "—" : $F{quota} + " units"]]></expression>
-							</element>
-						</detailCell>
-					</column>
-					<column kind="single" width="80">
-						<columnHeader style="Table_Header" height="22">
-							<element kind="staticText" x="0" y="0" width="80" height="22" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
-								<text><![CDATA[Used]]></text>
-							</element>
-						</columnHeader>
-						<detailCell style="Table_Cell" height="15">
-							<element kind="textField" x="0" y="0" width="80" height="15" forecolor="#E0E0E0" fontSize="8.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[$F{consumed} == null ? "0" : $F{service_type}.matches(".*data.*") ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 1024.0) + " GB" : ($F{service_type}.matches(".*voice.*") ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 60.0) + " min" : $F{consumed} + " msgs") ]]></expression>
-							</element>
-						</detailCell>
-					</column>
-					<column kind="single" width="70">
-						<columnHeader style="Table_Header" height="22">
-							<element kind="staticText" x="0" y="0" width="70" height="22" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
-								<text><![CDATA[Rate]]></text>
-							</element>
-						</columnHeader>
-						<detailCell style="Table_Cell" height="15">
-							<element kind="textField" x="0" y="0" width="70" height="15" forecolor="#E0E0E0" fontSize="8.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format($F{unit_rate})]]></expression>
-							</element>
-						</detailCell>
-					</column>
-					<column kind="single" width="100">
-						<columnHeader style="Table_Header" height="22">
-							<element kind="staticText" x="0" y="0" width="95" height="22" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Right" vTextAlign="Middle">
-								<text><![CDATA[Amount]]></text>
-							</element>
-						</columnHeader>
-						<detailCell style="Table_Cell" height="15">
-							<element kind="textField" x="0" y="0" width="95" height="15" forecolor="#FFFFFF" fontSize="8.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format($F{line_total}) + " EGP"]]></expression>
-							</element>
-						</detailCell>
-					</column>
-					<column kind="single" width="75">
-						<columnHeader style="Table_Header" height="22">
-							<element kind="staticText" x="0" y="0" width="70" height="22" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
-								<text><![CDATA[Note]]></text>
-							</element>
-						</columnHeader>
-						<detailCell style="Table_Cell" height="15">
-							<element kind="textField" x="0" y="0" width="70" height="15" forecolor="#888888" fontSize="7.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[$F{is_promotional} ? "PROMO ★" : ($F{is_roaming} ? "ROAMING" : "")]]></expression>
-							</element>
-						</detailCell>
-					</column>
-				</component>
+			
+			<element kind="rectangle" x="10" y="32" width="535" height="20" backcolor="#1A1A1A" radius="10">
+				<pen lineWidth="0.0"/>
 			</element>
-		</band>
+			<element kind="staticText" x="20" y="35" width="80" height="14" forecolor="#AAAAAA" fontSize="8.0" bold="true">
+				<text><![CDATA[SERVICE]]></text>
+			</element>
+			<element kind="staticText" x="110" y="35" width="70" height="14" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center">
+				<text><![CDATA[QUOTA]]></text>
+			</element>
+			<element kind="staticText" x="190" y="35" width="70" height="14" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center">
+				<text><![CDATA[USED]]></text>
+			</element>
+			<element kind="staticText" x="270" y="35" width="60" height="14" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center">
+				<text><![CDATA[RATE]]></text>
+			</element>
+			<element kind="staticText" x="340" y="35" width="80" height="14" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Right">
+				<text><![CDATA[AMOUNT]]></text>
+			</element>
+			<element kind="staticText" x="430" y="35" width="100" height="14" forecolor="#AAAAAA" fontSize="8.0" bold="true" hTextAlign="Center">
+				<text><![CDATA[NOTE]]></text>
+			</element>
+			
+			<element kind="staticText" x="20" y="60" width="80" height="16" forecolor="#FFFFFF" fontSize="10.0">
+				<text><![CDATA[📱 Voice]]></text>
+			</element>
+			<element kind="staticText" x="110" y="60" width="70" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Center">
+				<text><![CDATA[Unlimited]]></text>
+			</element>
+			<element kind="textField" x="190" y="60" width="70" height="16" forecolor="#00FF00" fontSize="9.0" hTextAlign="Center">
+				<expression><![CDATA[new java.text.DecimalFormat("#,##0").format($F{voice_usage} / 60.0) + " min"]]></expression>
+			</element>
+			<element kind="staticText" x="270" y="60" width="60" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Center">
+				<text><![CDATA[—]]></text>
+			</element>
+			<element kind="staticText" x="340" y="60" width="80" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Right">
+				<text><![CDATA[Included]]></text>
+			</element>
+			<element kind="staticText" x="430" y="60" width="100" height="16" forecolor="#00FF00" fontSize="8.0" hTextAlign="Center">
+				<text><![CDATA[No Charge]]></text>
+			</element>
+			
+			<element kind="staticText" x="20" y="80" width="80" height="16" forecolor="#FFFFFF" fontSize="10.0">
+				<text><![CDATA[📊 Data]]></text>
+			</element>
+			<element kind="staticText" x="110" y="80" width="70" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Center">
+				<text><![CDATA[10 GB]]></text>
+			</element>
+			<element kind="textField" x="190" y="80" width="70" height="16" forecolor="#00FF00" fontSize="9.0" hTextAlign="Center">
+				<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format($F{data_usage} / 1024.0) + " GB"]]></expression>
+			</element>
+			<element kind="staticText" x="270" y="80" width="60" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Center">
+				<text><![CDATA[0.50]]></text>
+			</element>
+			<element kind="textField" x="340" y="80" width="80" height="16" forecolor="#FFFFFF" fontSize="9.0" hTextAlign="Right">
+				<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format(Math.max(0, ($F{data_usage} / 1024.0 - 10) * 0.50)) + " EGP"]]></expression>
+			</element>
+			<element kind="staticText" x="430" y="80" width="100" height="16" forecolor="#888888" fontSize="8.0" hTextAlign="Center">
+				<text><![CDATA[Overage]]></text>
+			</element>
+			
+			<element kind="staticText" x="20" y="100" width="80" height="16" forecolor="#FFFFFF" fontSize="10.0">
+				<text><![CDATA[💬 SMS]]></text>
+			</element>
+			<element kind="staticText" x="110" y="100" width="70" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Center">
+				<text><![CDATA[Unlimited]]></text>
+			</element>
+			<element kind="textField" x="190" y="100" width="70" height="16" forecolor="#00FF00" fontSize="9.0" hTextAlign="Center">
+				<expression><![CDATA[$F{sms_usage} + " msgs"]]></expression>
+			</element>
+			<element kind="staticText" x="270" y="100" width="60" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Center">
+				<text><![CDATA[—]]></text>
+			</element>
+			<element kind="staticText" x="340" y="100" width="80" height="16" forecolor="#AAAAAA" fontSize="9.0" hTextAlign="Right">
+				<text><![CDATA[Included]]></text>
+			</element>
+			<element kind="staticText" x="430" y="100" width="100" height="16" forecolor="#00FF00" fontSize="8.0" hTextAlign="Center">
+				<text><![CDATA[No Charge]]></text>
+			</element>
+</band>
 		<!-- BAND 4: FINANCIAL SUMMARY -->
 		<band height="235">
 			<element kind="ellipse" x="10" y="10" width="8" height="8" backcolor="#FF0000" mode="Opaque">
@@ -311,24 +290,7 @@
 			<element kind="textField" x="420" y="40" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{recurring_fees} + " EGP"]]></expression>
 			</element>
-			<element kind="staticText" x="30" y="60" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
-				<text><![CDATA[Domestic Overage]]></text>
-			</element>
-			<element kind="textField" x="420" y="60" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
-				<expression><![CDATA[$F{overage_charge} + " EGP"]]></expression>
-			</element>
-			<element kind="staticText" x="30" y="80" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
-				<text><![CDATA[Roaming Charges]]></text>
-			</element>
-			<element kind="textField" x="420" y="80" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
-				<expression><![CDATA[$F{roaming_charge} + " EGP"]]></expression>
-			</element>
-			<element kind="staticText" x="30" y="100" width="260" height="16" forecolor="#4CAF50" fontSize="10.0" bold="true">
-				<text><![CDATA[Promotional Savings]]></text>
-			</element>
-			<element kind="textField" x="420" y="100" width="110" height="16" forecolor="#4CAF50" fontSize="10.0" bold="true" hTextAlign="Right" blankWhenNull="true">
-				<expression><![CDATA["-" + $F{promotional_discount} + " EGP"]]></expression>
-			</element>
+			
 			<element kind="staticText" x="30" y="120" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
 				<text><![CDATA[Government Tax (14%)]]></text>
 			</element>
@@ -340,6 +302,27 @@
 			</element>
 			<element kind="textField" x="420" y="140" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
 				<expression><![CDATA[$F{one_time_fees} + " EGP"]]></expression>
+			</element>
+			
+			<element kind="staticText" x="30" y="60" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
+				<text><![CDATA[Overage Charges]]></text>
+			</element>
+			<element kind="textField" x="420" y="60" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+				<expression><![CDATA[$F{overage_charge} + " EGP"]]></expression>
+			</element>
+			
+			<element kind="staticText" x="30" y="80" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
+				<text><![CDATA[Roaming Charges]]></text>
+			</element>
+			<element kind="textField" x="420" y="80" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+				<expression><![CDATA[$F{roaming_charge} + " EGP"]]></expression>
+			</element>
+			
+			<element kind="staticText" x="30" y="100" width="260" height="16" forecolor="#00FF00" fontSize="10.0">
+				<text><![CDATA[Promotional Discount]]></text>
+			</element>
+			<element kind="textField" x="420" y="100" width="110" height="16" forecolor="#00FF00" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+				<expression><![CDATA["-" + $F{promotional_discount} + " EGP"]]></expression>
 			</element>
  
 			<element kind="rectangle" x="10" y="175" width="535" height="55" backcolor="#1A1A1A" radius="10" mode="Opaque">
