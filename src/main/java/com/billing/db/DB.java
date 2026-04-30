@@ -135,8 +135,12 @@ public class DB {
                     for (int i = 1; i <= columns; i++) {
                         Object val = rs.getObject(i);
                         if (val != null && val.getClass().getName().contains("PGobject")) {
-                            // Only convert to String if it's NOT a number (e.g. JSON, Enum)
-                            if (!(val instanceof Number)) {
+                            String type = ((org.postgresql.util.PGobject)val).getType();
+                            if (type.equalsIgnoreCase("numeric") || type.equalsIgnoreCase("int8") || type.equalsIgnoreCase("int4")) {
+                                // Keep as is or handle specifically if needed, but for now toString is safer if it was already breaking
+                                // Actually, let's try to let the driver handle it by NOT using getObject for these? 
+                                // No, the driver should have returned BigDecimal for numeric.
+                            } else {
                                 val = val.toString();
                             }
                         }

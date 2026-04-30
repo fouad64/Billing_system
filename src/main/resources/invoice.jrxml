@@ -36,7 +36,7 @@
 		SELECT 
 			ua.name AS customer_name, ua.email AS customer_email,
 			COALESCE(ua.address, 'N/A') AS customer_address, ua.id AS customer_id,
-			b.billing_period_start, b.billing_period_end, b.billing_date,
+			b.billing_period_start, b.billing_period_end, b.billing_date, b.due_date,
 			COALESCE(b.recurring_fees, 0) AS recurring_fees,
 			COALESCE(b.one_time_fees, 0) AS one_time_fees,
 			COALESCE(b.voice_usage, 0) AS voice_usage,
@@ -63,6 +63,7 @@
 	<field name="billing_period_start" class="java.sql.Date"/>
 	<field name="billing_period_end" class="java.sql.Date"/>
 	<field name="billing_date" class="java.sql.Date"/>
+	<field name="due_date" class="java.sql.Date"/>
 	<field name="recurring_fees" class="java.math.BigDecimal"/>
 	<field name="one_time_fees" class="java.math.BigDecimal"/>
 	<field name="voice_usage" class="java.lang.Long"/>
@@ -154,13 +155,16 @@
 			<element kind="textField" x="302" y="64" width="228" height="16" forecolor="#FFFFFF" fontSize="10.0" blankWhenNull="true">
 				<expression><![CDATA["Period: " + new java.text.SimpleDateFormat("dd/MM/yyyy").format($F{billing_period_start})]]></expression>
 			</element>
-			<element kind="textField" x="302" y="82" width="228" height="16" forecolor="#FFFFFF" fontSize="10.0" blankWhenNull="true">
+			<element kind="textField" x="302" y="80" width="228" height="16" forecolor="#FFFFFF" fontSize="10.0" blankWhenNull="true">
 				<expression><![CDATA["Billed: " + new java.text.SimpleDateFormat("dd/MM/yyyy").format($F{billing_date})]]></expression>
 			</element>
-			<element kind="rectangle" x="350" y="104" width="140" height="26" backcolor="#FF0000" radius="4" mode="Opaque">
-				<pen lineWidth="1.5" lineColor="#FF0000"/>
+			<element kind="textField" x="302" y="98" width="228" height="14" forecolor="#AAAAAA" fontSize="9.0" blankWhenNull="true">
+				<expression><![CDATA["Due: " + new java.text.SimpleDateFormat("dd/MM/yyyy").format($F{due_date})]]></expression>
 			</element>
-			<element kind="textField" x="350" y="106" width="140" height="22" forecolor="#FFFFFF" fontSize="13.0" bold="true" hTextAlign="Center" blankWhenNull="true">
+			<element kind="rectangle" x="350" y="118" width="140" height="20" backcolor="#FF0000" radius="4" mode="Opaque">
+				<pen lineWidth="1.0" lineColor="#FF0000"/>
+			</element>
+			<element kind="textField" x="350" y="118" width="140" height="20" forecolor="#FFFFFF" fontSize="11.0" bold="true" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
 				<expression><![CDATA[$F{bill_status}.toUpperCase()]]></expression>
 			</element>
 		</band>
@@ -251,7 +255,7 @@
 						</columnHeader>
 						<detailCell style="Table_Cell" height="15">
 							<element kind="textField" x="0" y="0" width="80" height="15" forecolor="#E0E0E0" fontSize="8.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[$F{consumed} == null ? "0" : $F{service_type}.matches(".*data.*") ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 1024.0) + " GB" : ($F{service_type}.matches(".*voice.*") ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 60.0) + " min" : $F{consumed} + " msgs") ]]></expression>
+								<expression><![CDATA[$F{consumed} == null ? "0" : $F{service_type}.matches(".*data.*") ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 1024.0) + " GB" : ($F{service_type}.matches(".*voice.*") ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 60.0) + " min" : ($F{service_type}.equals("fee") ? $F{consumed} + " unit" : $F{consumed} + " msgs")) ]]></expression>
 							</element>
 						</detailCell>
 					</column>
@@ -263,7 +267,7 @@
 						</columnHeader>
 						<detailCell style="Table_Cell" height="15">
 							<element kind="textField" x="0" y="0" width="70" height="15" forecolor="#E0E0E0" fontSize="8.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format($F{unit_rate})]]></expression>
+								<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format(new java.math.BigDecimal($F{unit_rate} == null ? "0.0" : $F{unit_rate}.toString()))]]></expression>
 							</element>
 						</detailCell>
 					</column>
@@ -275,7 +279,7 @@
 						</columnHeader>
 						<detailCell style="Table_Cell" height="15">
 							<element kind="textField" x="0" y="0" width="95" height="15" forecolor="#FFFFFF" fontSize="8.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format($F{line_total}) + " EGP"]]></expression>
+								<expression><![CDATA[new java.text.DecimalFormat("#,##0.00").format(new java.math.BigDecimal($F{line_total} == null ? "0.0" : $F{line_total}.toString())) + " EGP"]]></expression>
 							</element>
 						</detailCell>
 					</column>
