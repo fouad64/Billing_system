@@ -93,13 +93,13 @@ public class BillAutomationWorker implements Runnable {
             Map<String, Object> params = new HashMap<>();
             params.put("BILL_ID", billId);
             
-            InputStream logoStream = com.billing.util.JasperLoader.getResourceStream("logo.svg");
+            InputStream logoStream = com.billing.util.JasperLoader.getResourceStream("red-logo.png");
             params.put("LOGO_PATH", logoStream);
             
             params.put("GROUP_NAME", "FMRZ Telecom Group");
-            params.put("COMPANY_CARE", "111 (Free from FMRZ)");
+            params.put("COMPANY_CARE", "+20 101 234 5678");
             params.put("COMPANY_WEB", "www.fmrz-telecom.com");
-            params.put("COMPANY_EMAIL", "support@fmrz-telecom.com");
+            params.put("COMPANY_EMAIL", "support@fmrz.com");
             params.put("BILLING_DATE", new java.util.Date());
 
             // Load Icons
