@@ -327,22 +327,22 @@
 			<element kind="textField" x="420" y="90" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{roaming_charge} + " EGP"]]></expression>
 			</element>
-			<element kind="staticText" x="30" y="100" width="260" height="16" forecolor="#4CAF50" fontSize="10.0" bold="true">
+			<element kind="staticText" x="30" y="115" width="260" height="16" forecolor="#4CAF50" fontSize="10.0" bold="true">
 				<text><![CDATA[Promotional Savings]]></text>
 			</element>
-			<element kind="textField" x="420" y="100" width="110" height="16" forecolor="#4CAF50" fontSize="10.0" bold="true" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="115" width="110" height="16" forecolor="#4CAF50" fontSize="10.0" bold="true" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA["-" + $F{promotional_discount} + " EGP"]]></expression>
 			</element>
-			<element kind="staticText" x="30" y="120" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
+			<element kind="staticText" x="30" y="140" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0">
 				<text><![CDATA[Government Tax (14%)]]></text>
 			</element>
-			<element kind="textField" x="420" y="120" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
+			<element kind="textField" x="420" y="140" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" blankWhenNull="true">
 				<expression><![CDATA[$F{taxes} + " EGP"]]></expression>
 			</element>
-			<element kind="staticText" x="30" y="140" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0" vTextAlign="Middle">
+			<element kind="staticText" x="30" y="165" width="260" height="16" forecolor="#E0E0E0" fontSize="10.0" vTextAlign="Middle">
 				<text><![CDATA[One-time Fees]]></text>
 			</element>
-			<element kind="textField" x="420" y="140" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
+			<element kind="textField" x="420" y="165" width="110" height="16" forecolor="#FFFFFF" fontSize="10.0" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
 				<expression><![CDATA[$F{one_time_fees} + " EGP"]]></expression>
 			</element>
  
