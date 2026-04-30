@@ -281,6 +281,35 @@ curl http://localhost:8080/health
 
 ## 🗄️ Database Schema
 
+### SQL File Organization
+
+```
+├── schema/
+│   ├── 00_main.sql           # Core schema (tables, types, functions)
+│   ├── 01_upgrades.sql      # Schema upgrade scripts
+│   └── 02_demo.sql          # Demo SQL statements
+├── data/
+│   ├── 01_dummy_data.sql    # Basic test data
+│   └── 02_real_world_data.sql # Real world test data
+└── backups/
+    ├── local_db_dump.sql    # Local database dump
+    └── neon_db_dump.sql     # NeonDB cloud dump
+```
+
+### Loading Order
+
+```sql
+-- 1. Create schema
+psql -U user -d billing -f schema/00_main.sql
+
+-- 2. Apply upgrades (if any)
+psql -U user -d billing -f schema/01_upgrades.sql
+
+-- 3. Load test data (optional)
+psql -U user -d billing -f data/01_dummy_data.sql
+psql -U user -d billing -f data/02_real_world_data.sql
+```
+
 ### NeonDB Configuration
 
 ```
