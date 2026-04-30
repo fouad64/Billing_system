@@ -41,6 +41,11 @@ public class DebugJasper {
                 }
             } catch (Exception e) {
                 pw.println("❌ FAILED: Jasper compilation failed!");
+                Throwable t = e;
+                while (t != null) {
+                    pw.println("CAUSE: " + t.getClass().getName() + ": " + t.getMessage());
+                    t = t.getCause();
+                }
                 e.printStackTrace(pw);
             }
             pw.flush();
