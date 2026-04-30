@@ -17,13 +17,24 @@ public class DebugJasper {
         }
         
         try (FileInputStream is = new FileInputStream(f)) {
+            System.out.println("🔍 TESTING: Standard JDK DocumentBuilder parsing...");
+            javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            javax.xml.parsers.DocumentBuilder builder = factory.newDocumentBuilder();
+            builder.parse(is);
+            System.out.println("✅ SUCCESS: Standard JDK parsing works!");
+        } catch (Exception e) {
+            System.err.println("❌ FAILED: Standard JDK parsing failed!");
+            e.printStackTrace();
+        }
+
+        try (FileInputStream is = new FileInputStream(f)) {
             byte[] bytes = is.readAllBytes();
-            String content = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            System.out.println("📜 FILE CONTENT START:\n" + content + "\n📜 FILE CONTENT END");
+            System.out.println("📜 FILE CONTENT LENGTH: " + bytes.length);
             
             try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(bytes)) {
                 JasperCompileManager.compileReport(bais);
-                System.out.println("✅ SUCCESS: Report compiled successfully!");
+                System.out.println("✅ SUCCESS: Jasper compilation works!");
             }
         } catch (Exception e) {
             System.err.println("❌ FAILED: Compilation failed!");
