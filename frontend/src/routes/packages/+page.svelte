@@ -151,6 +151,27 @@
     startCycle();
   }
 
+  const formatUsage = (value, type) => {
+    if (!value) return '0';
+    const t = String(type || '').toLowerCase();
+    if (t === 'voice') {
+      if (value >= 60) return (value / 60).toFixed(0);
+      return value;
+    }
+    if (t === 'data') {
+      if (value >= 1073741824) return (value / 1073741824).toFixed(0);
+      return (value / 1048576).toFixed(0);
+    }
+    return value;
+  };
+
+  const formatUnit = (value, type) => {
+    const t = String(type || '').toLowerCase();
+    if (t === 'voice') return value >= 60 ? 'Min' : 'Sec';
+    if (t === 'data') return value >= 1073741824 ? 'GB' : 'MB';
+    return 'SMS';
+  };
+
   $effect(() => {
     loadData();
     startCycle();
@@ -450,8 +471,8 @@
             </div>
 
             <div class="quota-text">
-               <span class="quota-val">{pkg.amount}</span>
-               <span class="quota-unit">{pkg.type === 'data' ? 'MB' : pkg.type === 'voice' ? 'Min' : 'SMS'}</span>
+               <span class="quota-val">{formatUsage(pkg.amount, pkg.type)}</span>
+               <span class="quota-unit">{formatUnit(pkg.amount, pkg.type)}</span>
             </div>
 
             <button 

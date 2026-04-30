@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
-  import { toast } from '$lib/components/Toast.svelte';
+  import { showToast } from '$lib/toast.svelte.js';
 
   let cdrs = $state([]);
   let loading = $state(true);
@@ -40,13 +40,13 @@
     try {
       const res = await fetch('/api/cdr/upload', { method: 'POST', body: formData });
       if (res.ok) {
-        toast.success('CDR file uploaded and parsed successfully');
+        showToast('CDR file uploaded and parsed successfully');
         await loadCDRs();
       } else {
-        toast.error('Failed to upload CDR file');
+        showToast('Failed to upload CDR file', 'error');
       }
     } catch (err) {
-      toast.error('Error uploading file');
+      showToast('Error uploading file', 'error');
     } finally {
       uploading = false;
     }
@@ -58,13 +58,13 @@
       const res = await fetch('/api/cdr/import', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Processing complete! Rated: ${data.ratedCount}, Rejected: ${data.rejectedCount}`);
+        showToast(`Processing complete! Rated: ${data.ratedCount}, Rejected: ${data.rejectedCount}`);
         await loadCDRs();
       } else {
-        toast.error(data.error || 'Import failed');
+        showToast(data.error || 'Import failed', 'error');
       }
     } catch (err) {
-      toast.error('Network error during import');
+      showToast('Network error during import', 'error');
     } finally {
       importing = false;
     }
@@ -75,11 +75,11 @@
     try {
       const res = await fetch('/api/cdr/generate', { method: 'POST' });
       if (res.ok) {
-        toast.success('100 Fresh CDR records generated in input folder');
+        showToast('100 Fresh CDR records generated in input folder');
         await loadCDRs();
       }
     } catch (err) {
-      toast.error('Failed to generate samples');
+      showToast('Failed to generate samples', 'error');
     } finally {
       generating = false;
     }

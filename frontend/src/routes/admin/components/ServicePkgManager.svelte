@@ -17,6 +17,23 @@
     description: '',
     is_roaming: false
   });
+  let displayAmount = $state(0);
+  let displayUnit = $state('');
+
+  function formatUsage(value, type) {
+    if (!value) return '0';
+    const t = String(type || '').toLowerCase();
+    if (t === 'voice') {
+      if (value >= 60) return (value / 60).toFixed(1) + ' min';
+      return value + ' sec';
+    }
+    if (t === 'data') {
+      if (value >= 1073741824) return (value / 1073741824).toFixed(2) + ' GB';
+      if (value >= 1048576) return (value / 1048576).toFixed(1) + ' MB';
+      return (value / 1024).toFixed(1) + ' KB';
+    }
+    return value;
+  }
 
   async function fetchPackages() {
     loading = true;
@@ -43,16 +60,54 @@
       description: '',
       is_roaming: false
     };
+    displayAmount = 0;
+    displayUnit = 'min';
     showModal = true;
   }
 
   function openEditModal(pkg) {
     isEditing = true;
     currentPkg = { ...pkg };
+    
+    // Set display values
+    if (pkg.type === 'voice') {
+      if (pkg.amount % 60 === 0) {
+        displayAmount = pkg.amount / 60;
+        displayUnit = 'min';
+      } else {
+        displayAmount = pkg.amount;
+        displayUnit = 'sec';
+      }
+    } else if (pkg.type === 'data') {
+      if (pkg.amount % 1073741824 === 0) {
+        displayAmount = pkg.amount / 1073741824;
+        displayUnit = 'GB';
+      } else if (pkg.amount % 1048576 === 0) {
+        displayAmount = pkg.amount / 1048576;
+        displayUnit = 'MB';
+      } else {
+        displayAmount = pkg.amount;
+        displayUnit = 'B';
+      }
+    } else {
+      displayAmount = pkg.amount;
+      displayUnit = 'count';
+    }
     showModal = true;
   }
 
   async function savePackage() {
+    // Convert display to raw
+    if (currentPkg.type === 'voice') {
+      currentPkg.amount = displayUnit === 'min' ? displayAmount * 60 : displayAmount;
+    } else if (currentPkg.type === 'data') {
+      if (displayUnit === 'GB') currentPkg.amount = Math.round(displayAmount * 1073741824);
+      else if (displayUnit === 'MB') currentPkg.amount = Math.round(displayAmount * 1048576);
+      else currentPkg.amount = displayAmount;
+    } else {
+      currentPkg.amount = displayAmount;
+    }
+
     const url = isEditing ? `/api/admin/service-packages/${currentPkg.id}` : '/api/admin/service-packages';
     const method = isEditing ? 'PUT' : 'POST';
     try {
@@ -131,7 +186,7 @@
             <div class="col">
               <span class="badge badge-{pkg.type}">{pkg.type}</span>
             </div>
-            <div class="col font-mono">{pkg.amount}</div>
+            <div class="col font-mono">{formatUsage(pkg.amount, pkg.type)}</div>
             <div class="col font-mono">EGP {pkg.price}</div>
             <div class="col">{pkg.priority}</div>
             <div class="col">
@@ -175,8 +230,22 @@
     </div>
 
     <div class="form-group">
-      <label>Amount (MB/Min/Count)</label>
-      <input type="number" class="input" bind:value={currentPkg.amount} />
+      <label>Quota Amount</label>
+      <div style="display: flex; gap: 0.5rem;">
+        <input type="number" class="input" style="flex: 1" bind:value={displayAmount} />
+        <select class="input" style="width: 100px;" bind:value={displayUnit}>
+          {#if currentPkg.type === 'voice'}
+            <option value="min">Min</option>
+            <option value="sec">Sec</option>
+          {:else if currentPkg.type === 'data'}
+            <option value="GB">GB</option>
+            <option value="MB">MB</option>
+            <option value="B">Bytes</option>
+          {:else}
+            <option value="count">Count</option>
+          {/if}
+        </select>
+      </div>
     </div>
 
     <div class="form-group">

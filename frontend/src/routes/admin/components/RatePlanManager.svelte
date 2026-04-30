@@ -18,6 +18,21 @@
     servicePackageIds: []
   });
 
+  function formatUsage(value, type) {
+    if (!value) return '0';
+    const t = String(type || '').toLowerCase();
+    if (t === 'voice') {
+      if (value >= 60) return (value / 60).toFixed(1) + ' min';
+      return value + ' sec';
+    }
+    if (t === 'data') {
+      if (value >= 1073741824) return (value / 1073741824).toFixed(2) + ' GB';
+      if (value >= 1048576) return (value / 1048576).toFixed(1) + ' MB';
+      return (value / 1024).toFixed(1) + ' KB';
+    }
+    return value;
+  }
+
   async function fetchData() {
     loading = true;
     try {
@@ -209,7 +224,7 @@
             onclick={() => togglePackage(pkg.id)}
           >
             <span class="pkg-name">{pkg.name}</span>
-            <span class="pkg-meta">{pkg.amount} {pkg.type === 'data' ? 'MB' : pkg.type === 'voice' ? 'Min' : 'SMS'}</span>
+            <span class="pkg-meta">{formatUsage(pkg.amount, pkg.type)}</span>
             {#if currentPlan.servicePackageIds.includes(pkg.id)}
               <div class="check-overlay">✓</div>
             {/if}
