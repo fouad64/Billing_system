@@ -299,7 +299,7 @@
 			</element>
 		</band>
 		<!-- BAND 4: FINANCIAL SUMMARY -->
-		<band height="280">
+		<band height="255">
 			<element kind="ellipse" x="10" y="10" width="8" height="8" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
@@ -346,28 +346,22 @@
 				<expression><![CDATA[$F{one_time_fees} + " EGP"]]></expression>
 			</element>
  
-			<element kind="rectangle" x="10" y="210" width="535" height="55" backcolor="#1A1A1A" radius="10" mode="Opaque">
+			<element kind="rectangle" x="10" y="195" width="535" height="55" backcolor="#1A1A1A" radius="10" mode="Opaque">
 				<pen lineWidth="1.0" lineColor="#FF0000"/>
 			</element>
-			<element kind="rectangle" x="10" y="210" width="5" height="55" backcolor="#FF0000" mode="Opaque">
+			<element kind="rectangle" x="10" y="195" width="5" height="55" backcolor="#FF0000" mode="Opaque">
 				<pen lineWidth="0.0"/>
 			</element>
-			<element kind="ellipse" x="28" y="217" width="40" height="40" backcolor="#FF0000" mode="Opaque">
-				<pen lineWidth="0.0"/>
-			</element>
-			<element kind="staticText" x="28" y="223" width="40" height="28" forecolor="#FFFFFF" fontSize="14.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
-				<text><![CDATA[]]></text>
-			</element>
-			<element kind="staticText" x="80" y="222" width="220" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" vTextAlign="Middle">
+			<element kind="staticText" x="80" y="207" width="220" height="30" forecolor="#FF0000" fontSize="18.0" bold="true" vTextAlign="Middle">
 				<text><![CDATA[TOTAL DUE]]></text>
 			</element>
-			<element kind="textField" x="310" y="215" width="235" height="44" forecolor="#FF0000" fontSize="24.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
+			<element kind="textField" x="310" y="200" width="235" height="44" forecolor="#FF0000" fontSize="24.0" bold="true" hTextAlign="Right" vTextAlign="Middle" blankWhenNull="true">
 				<expression><![CDATA[$F{total_amount} + " EGP"]]></expression>
 			</element>
 		</band>
 	</detail>
 
-	<pageFooter height="40">
+	<pageFooter height="30">
 		<element kind="line" x="10" y="5" width="535" height="1" forecolor="#333333"/>
 		<element kind="textField" x="10" y="18" width="170" height="20" forecolor="#808080" fontSize="9.0" blankWhenNull="true">
 			<expression><![CDATA["Care: " + $P{COMPANY_CARE}]]></expression>
