@@ -94,6 +94,12 @@ public class CustomerProfileServlet extends BaseServlet {
                         Map<String, Object> params = new HashMap<>();
                         params.put("BILL_ID", billId);
                         
+                        // Get bill status separately
+                        List<Map<String, Object>> billData = DB.executeSelect(
+                            "SELECT status FROM bill WHERE id = ?", billId);
+                        String billStatus = billData.isEmpty() ? "issued" : billData.get(0).get("status").toString();
+                        params.put("BILL_STATUS", billStatus);
+                        
                         // Logo handling
                         InputStream logoStream = JasperLoader.getResourceStream("red-logo.png");
                         if (logoStream != null) {
@@ -117,11 +123,15 @@ public class CustomerProfileServlet extends BaseServlet {
                 default -> sendError(res, 404, "Unknown customer endpoint: " + path);
             }
         } catch (Throwable e) {
-            logger.error("API Logic Error in CustomerProfileServlet", e);
+            logger.error("Invoice Download Error - Full Stack Trace:", e);
+            String cause = e.getMessage();
+            if (e.getCause() != null) {
+                cause = e.getCause().getMessage();
+            }
             try {
                 if (!res.isCommitted()) {
                     res.reset();
-                    sendError(res, 500, "Server Error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                    sendError(res, 500, "Server Error: " + cause);
                 }
             } catch (IOException ignored) {}
         }
