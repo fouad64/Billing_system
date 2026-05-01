@@ -95,17 +95,17 @@
 
   // Smart Formatter: Logic updated to use the "Gold Standard" (Bytes/Seconds)
   const formatUsage = (value, serviceType) => {
-    if (!value) return '0';
+    if (!value && value !== 0) return '0';
     const t = String(serviceType || '').toLowerCase();
     
+    // Voice: seconds to min/sec
     if (t === 'voice' || t.includes('call') || t.includes('min')) {
-      // Value is in Seconds
       if (value >= 60) return (value / 60).toFixed(1) + ' min';
       return value + ' sec';
     }
 
-    if (t === 'data' || t.includes('internet') || t.includes('gb') || t.includes('mb')) {
-      // Value is in Bytes
+    // Data: bytes to KB/MB/GB (Now including free_units which are often data gifts)
+    if (t === 'data' || t === 'free_units' || t.includes('internet') || t.includes('gb') || t.includes('mb')) {
       if (value >= 1073741824) return (value / 1073741824).toFixed(2) + ' GB';
       if (value >= 1048576) return (value / 1048576).toFixed(1) + ' MB';
       if (value >= 1024) return (value / 1024).toFixed(1) + ' KB';
@@ -113,6 +113,11 @@
     }
 
     if (t === 'sms') return value + ' SMS';
+    
+    // Fallback: If it's a huge number, it's likely unformatted data
+    if (value > 1000000) {
+        return (value / 1048576).toFixed(1) + ' MB';
+    }
     
     return value;
   };
@@ -212,7 +217,9 @@
                 <th>MSISDN</th>
                 <th>Destination</th>
                 <th>Usage</th>
+                <th>Cost</th>
                 <th>Type</th>
+                <th>Home / Roaming</th>
                 <th>Timestamp</th>
                 <th>Status</th>
               </tr>
@@ -227,6 +234,9 @@
                   <td class="usage-cell">
                     <span class="usage-value">{formatUsage(cdr.duration, cdr.service_type)}</span>
                   </td>
+                  <td class="font-bold text-red" style="color: #FF3E00;">
+                    {(cdr.cost !== undefined && cdr.cost !== null) ? `${cdr.cost} EGP` : '—'}
+                  </td>
                   <td>
                     <div class="badge {typeInfo.class}">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d={typeInfo.icon}/></svg>
@@ -234,6 +244,16 @@
                       {#if (cdr.type || '').toLowerCase().includes('gift') || (cdr.type || '').toLowerCase().includes('welcome')}
                         <small style="opacity: 0.7; margin-left: 4px;">({cdr.service_type})</small>
                       {/if}
+                    </div>
+                  </td>
+                  <td>
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <span class="text-xs text-dim" style="font-size: 0.7rem;">{cdr.hplmn || 'Unknown'}</span>
+                        {#if cdr.vplmn}
+                            <span class="badge badge-secondary" style="font-size: 0.65rem; padding: 1px 4px; border-radius: 4px;">
+                                📡 {cdr.vplmn}
+                            </span>
+                        {/if}
                     </div>
                   </td>
                   <td class="text-dim text-sm">{formatDate(cdr.timestamp)}</td>

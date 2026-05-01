@@ -68,7 +68,12 @@ public class DB {
             
             // FIX: Ensure 'public' schema is in the search path for every connection.
             // This is required for Neon's pooler which defaults to an empty search path.
-            config.setConnectionInitSql("SET search_path TO public, \"$user\";");
+            // Use set_config() for proper PostgreSQL variable setting
+            String envGuard = System.getenv("RAILWAY_STATIC_URL") != null ? "production" : "development";
+            config.setConnectionInitSql(
+                "SET search_path TO public; " +
+                "SELECT set_config('app.environment', '" + envGuard + "', false)"
+            );
 
             dataSource = new HikariDataSource(config);
         } catch (Exception e) {
@@ -161,6 +166,26 @@ public class DB {
     }
 
     /**
+     * Executes an INSERT statement and returns the auto-generated key.
+     * @return The auto-generated ID as a String.
+     */
+    public static String executeInsert(String sql, Object... params) throws SQLException {
+        try (Connection conn = getConnection();
+             java.sql.PreparedStatement ps = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+            for (int i = 0; i < params.length; i++) {
+                ps.setObject(i + 1, params[i]);
+            }
+            ps.executeUpdate();
+            try (java.sql.ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    return rs.getString(1);
+                }
+                return null;
+            }
+        }
+    }
+
+    /**
      * Helper to create a SQL Array for PostgreSQL.
      */
     public static java.sql.Array createSqlArray(String typeName, Object[] elements) throws SQLException {
@@ -179,6 +204,16 @@ public class DB {
     }
 
     public static String getEnvOrProp(String envKey, String propKey) {
+        // 0. Priority: DATABASE_URL (Railway/Cloud Standard)
+        String databaseUrl = System.getenv("DATABASE_URL");
+        if (databaseUrl != null && !databaseUrl.trim().isEmpty() && envKey.equals("DB_URL")) {
+            if (databaseUrl.startsWith("postgres://")) {
+                // Transform postgres:// to jdbc:postgresql://
+                return databaseUrl.replace("postgres://", "jdbc:postgresql://");
+            }
+            return databaseUrl;
+        }
+
         // 1. Check Environment Variables
         String val = System.getenv(envKey);
         
@@ -192,5 +227,29 @@ public class DB {
             val = props.getProperty(propKey);
         }
         return val;
+    }
+
+    @FunctionalInterface
+    public interface TransactionCallback<T> {
+        T doInTransaction(Connection conn) throws SQLException;
+    }
+
+    public static <T> T runInTransaction(TransactionCallback<T> callback) throws SQLException {
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            conn.setAutoCommit(false);
+            T result = callback.doInTransaction(conn);
+            conn.commit();
+            return result;
+        } catch (SQLException e) {
+            if (conn != null) conn.rollback();
+            throw e;
+        } finally {
+            if (conn != null) {
+                conn.setAutoCommit(true);
+                conn.close();
+            }
+        }
     }
 }

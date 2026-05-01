@@ -72,9 +72,15 @@ public abstract class BaseServlet extends HttpServlet {
     }
 
     protected String getPathParam(HttpServletRequest req) {
+        return getPathParam(req, 1);
+    }
+
+    protected String getPathParam(HttpServletRequest req, int index) {
         String pathInfo = req.getPathInfo();
         if (pathInfo == null || pathInfo.equals("/")) return null;
-        return pathInfo.substring(1);
+        String[] parts = pathInfo.split("/");
+        if (index < parts.length && index > 0) return parts[index];
+        return null;
     }
 
     protected int getIntParam(HttpServletRequest req, String name, int defaultValue) {

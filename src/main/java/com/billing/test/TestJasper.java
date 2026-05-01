@@ -11,7 +11,21 @@ public class TestJasper {
     public static void main(String[] args) {
         try {
             System.out.println("🚀 Starting Jasper Test with invoice.jrxml...");
-            int billId = (args.length > 0) ? Integer.parseInt(args[0]) : 1;
+            
+            // Dynamic Bill ID - get latest bill instead of hardcoded
+            int billId;
+            if (args.length > 0) {
+                billId = Integer.parseInt(args[0]);
+            } else {
+                // Fetch latest bill dynamically
+                var result = DB.executeSelect("SELECT MAX(id) as max_id FROM bill");
+                if (result.isEmpty() || result.get(0).get("max_id") == null) {
+                    System.err.println("❌ No bills found in database");
+                    return;
+                }
+                billId = ((Number) result.get(0).get("max_id")).intValue();
+            }
+            
             System.out.println("📄 Testing with Bill ID: " + billId);
             
             InputStream stream = TestJasper.class.getResourceAsStream("/invoice.jrxml");

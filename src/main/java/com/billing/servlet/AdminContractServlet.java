@@ -37,10 +37,32 @@ public class AdminContractServlet extends BaseServlet {
 
             if (path == null || "/".equals(path)) {
                 String search = req.getParameter("search");
+                String customerId = req.getParameter("customerId");
                 int limit = getIntParam(req, "limit", 50);
                 int offset = getIntParam(req, "offset", 0);
                 
-                List<Map<String, Object>> list = DB.executeSelect("SELECT * FROM get_all_contracts(?, ?, ?)", search, limit, offset);
+                String sql;
+                List<Object> params = new ArrayList<>();
+                if (customerId != null && !customerId.trim().isEmpty()) {
+                    sql = "SELECT c.id, c.msisdn, c.status, c.available_credit, u.name as customer_name, r.name as rateplan_name, " +
+                          "(SELECT COUNT(*) FROM contract WHERE user_account_id = ?) as total_count " +
+                          "FROM contract c " +
+                          "JOIN user_account u ON c.user_account_id = u.id " +
+                          "LEFT JOIN rateplan r ON c.rateplan_id = r.id " +
+                          "WHERE c.user_account_id = ? " +
+                          "LIMIT ? OFFSET ?";
+                    params.add(Integer.parseInt(customerId));
+                    params.add(Integer.parseInt(customerId));
+                    params.add(limit);
+                    params.add(offset);
+                } else {
+                    sql = "SELECT * FROM get_all_contracts(?, ?, ?)";
+                    params.add(search);
+                    params.add(limit);
+                    params.add(offset);
+                }
+                
+                List<Map<String, Object>> list = DB.executeSelect(sql, params.toArray());
                 long total = 0;
                 if (!list.isEmpty()) {
                     total = ((Number) list.get(0).get("total_count")).longValue();

@@ -19,7 +19,7 @@
     loading = true;
     try {
       const offset = page * limit;
-      const res = await fetch(`/api/admin/customers?search=${search}&limit=${limit}&offset=${offset}`);
+      const res = await fetch(`/api/admin/customers?search=${search}&limit=${limit}&offset=${offset}`, { credentials: 'include' });
       if (res.ok) {
         const result = await res.json();
         customers = result.data || [];
@@ -58,6 +58,7 @@
       const res = await fetch('/api/admin/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(newCustomer)
       });
       if (res.ok) {
