@@ -2,9 +2,12 @@
   import { base } from '$app/paths';
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
+  import BillDrilldown from '$lib/components/BillDrilldown.svelte';
   
   let invoices = $state([]);
   let loading = $state(true);
+  let selectedInvoice = $state(null);
+  let currentUserId = $state(null);
 
   async function checkAuthAndLoad() {
     loading = true;
@@ -19,6 +22,7 @@
         window.location.href = '/admin';
         return;
       }
+      currentUserId = user.id;
       
       await loadInvoices();
     } catch {
@@ -82,7 +86,7 @@
         </thead>
         <tbody>
           {#each invoices as inv, i}
-            <tr style="--delay: {i * 0.05}s">
+            <tr style="--delay: {i * 0.05}s" class="clickable-row" onclick={() => selectedInvoice = inv}>
               <td>
                 <span class="id-badge">#{inv.id}</span>
               </td>
@@ -105,6 +109,14 @@
     </div>
   {/if}
 </div>
+
+{#if selectedInvoice}
+  <BillDrilldown 
+    billId={selectedInvoice.id} 
+    userId={currentUserId} 
+    onClose={() => selectedInvoice = null} 
+  />
+{/if}
 
 <style>
   .page-header { margin-bottom: 3rem; }
@@ -158,10 +170,11 @@
   }
   
   .static-table tr:hover { 
-    background: rgba(255, 255, 255, 0.02) !important; 
+    background: rgba(224, 8, 0, 0.05) !important; 
     filter: none !important; 
     transform: none !important;
   }
+  .clickable-row { cursor: pointer; transition: all 0.2s !important; }
 
   .id-badge { 
     background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 6px;

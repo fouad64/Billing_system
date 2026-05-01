@@ -12,6 +12,8 @@ services:
     env_file:
       - .env
     environment:
+      # Environment flag for Production Guard
+      - RAILWAY_ENVIRONMENT=production
       # Paths for CDR processing inside the container
       - CDR_INPUT_PATH=/app/input
       - CDR_PROCESSED_PATH=/app/processed

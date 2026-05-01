@@ -57,8 +57,8 @@ def get_msisdns_with_status(config):
 
 def generate_cdrs(subscribers, count=100):
     cdrs = []
-    phone_destinations = ["201090000001", "201090000002", "201090000003", "201000000008", "201223344556"]
-    url_destinations = ["google.com", "facebook.com", "youtube.com", "fmrz-telecom.net", "whatsapp.net"]
+    phone_destinations = ["201090000001", "201090000002", "201090000003", "201000000008", "201223344556", "12125550199", "442079460958"]
+    url_destinations = ["google.com", "facebook.com", "youtube.com", "fmrz-telecom.net", "whatsapp.net", "netflix.com", "amazon.aws"]
     
     now = datetime.datetime.now()
     
@@ -88,9 +88,21 @@ def generate_cdrs(subscribers, count=100):
             dial_b = random.choice(phone_destinations)
             duration = 1
             
-        start_time = now - datetime.timedelta(days=random.randint(0, 30), hours=random.randint(0, 23), minutes=random.randint(0, 59))
+        # Roaming Simulation (15% chance of roaming)
+        hplmn = "EGYVO"
+        vplmn = ""
+        if random.random() < 0.15:
+            vplmn = random.choice(["DEUVO", "USAVO", "AREVO", "GBRVO"])
+        
+        start_time = now - datetime.timedelta(days=random.randint(0, 28), hours=random.randint(0, 23), minutes=random.randint(0, 59))
         time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
-        cdrs.append(f"1,{dial_a},{dial_b},{time_str},{duration},{service_id},EGYVO,,0")
+        
+        # External charges (simulating partner fees for roaming)
+        ext_charge = 0
+        if vplmn:
+            ext_charge = random.randint(0, 5) if service_id != 2 else random.randint(10, 50)
+
+        cdrs.append(f"1,{dial_a},{dial_b},{time_str},{duration},{service_id},{hplmn},{vplmn},{ext_charge}")
         
     return cdrs
 

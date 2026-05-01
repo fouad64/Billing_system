@@ -1,7 +1,10 @@
 <script>
   import { showToast } from '$lib/toast.svelte.js';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import BillDrilldown from '$lib/components/BillDrilldown.svelte';
+  import { page } from '$app/stores';
   let contractId = $state('');
+  let selectedBill = $state(null);
   // Billing History State
   let bills = $state([]);
   let billsTotal = $state(0);
@@ -322,7 +325,7 @@
     try {
       if (isAuditGlobalSelection) {
         // Global Audit Generation
-        const res = await fetch(`/api/admin/bills/generate-bulk?global=truFMRZsearch=${encodeURIComponent(missingSearch)}`, { 
+        const res = await fetch(`/api/admin/bills/generate-bulk?global=true&search=${encodeURIComponent(missingSearch)}`, { 
             method: 'POST', 
             credentials: 'include' 
         });
@@ -695,28 +698,28 @@
                    onchange={toggleAll} />
           </th>
           <th>Bill ID</th><th>Customer</th><th>Period</th>
-          <th style="min-width: 280px;">
+          <th style="min-width: 200px;">
             <div class="usage-grid header-grid">
-              <div class="usage-slot header-slot voice" title="Voice Minutes">
+              <div class="usage-slot header-slot voice" title="Voice">
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.28-2.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                <span style="font-size: 0.65rem; margin-left: 2px;">VOICE</span>
               </div>
-              <div class="usage-slot header-slot data" title="Data Usage">
+              <div class="usage-slot header-slot data" title="Data">
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-                <span style="font-size: 0.65rem; margin-left: 2px;">DATA</span>
               </div>
-              <div class="usage-slot header-slot sms" title="SMS Count">
+              <div class="usage-slot header-slot sms" title="SMS">
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                <span style="font-size: 0.65rem; margin-left: 2px;">SMS</span>
               </div>
             </div>
           </th>
-          <th>Total</th><th>Status</th><th>Actions</th>
+          <th class="text-right">Breakdown (EGP)</th>
+          <th class="text-right">Total</th>
+          <th>Status</th>
+          <th style="width: 100px;">Actions</th>
         </tr>
       </thead>
       <tbody>
         {#each bills as b}
-        <tr class:row-selected={selectedIds.has(b.id)}>
+        <tr class:row-selected={selectedIds.has(b.id)} class="clickable-row" onclick={() => selectedBill = b}>
           <td>
             {#if b.status !== 'paid'}
               <input type="checkbox" checked={selectedIds.has(b.id)} onchange={() => toggleSelect(b.id)} />
@@ -735,31 +738,59 @@
           <td>
             <div class="usage-grid">
               <div class="usage-slot voice" title="Voice">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l2.28-2.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                 <span>{formatVoice(b.voice_usage)}</span>
               </div>
               <div class="usage-slot data" title="Data">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
                 <span>{formatData(b.data_usage)}</span>
               </div>
               <div class="usage-slot sms" title="SMS">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 <span>{b.sms_usage || 0}</span>
               </div>
             </div>
           </td>
-          <td><span class="amount-num bold">{b.total_amount} EGP</span></td>
+          <td class="text-right">
+            <div class="financial-breakdown font-mono">
+              <div class="line"><span class="label">Plan:</span> <span class="value">{Number(b.subscription_fee || 0).toFixed(2)}</span></div>
+              
+              {#if (b.overage_amount || 0) > 0 || (b.roaming_amount || 0) > 0}
+                <div class="line text-gold">
+                  <span class="label">Overage:</span> 
+                  <span class="value">+{Number((b.overage_amount || 0) + (b.roaming_amount || 0)).toFixed(2)}</span>
+                </div>
+              {/if}
+              
+              <div class="separator"></div>
+              
+              <div class="line"><span class="label">VAT (14%):</span> <span class="value">{Number(b.tax_amount || 0).toFixed(2)}</span></div>
+            </div>
+          </td>
+          <td class="text-right">
+            <span class="amount-num bold text-cyan font-mono">{Number(b.total_amount).toFixed(2)}</span>
+          </td>
           <td>
             <span class="badge status-{b.status || 'issued'}">
               {b.status || 'issued'}
             </span>
           </td>
           <td>
-            {#if b.status !== 'paid'}
-              <button class="btn btn-secondary btn-sm" onclick={() => payBill(b.id)}>
-                Mark Paid
+            <div style="display:flex; gap: 0.5rem;">
+              {#if b.status !== 'paid'}
+                <button class="btn btn-secondary btn-sm" onclick={(e) => { e.stopPropagation(); payBill(b.id); }}>
+                  Pay
+                </button>
+              {/if}
+              <button 
+                class="btn btn-ghost btn-sm" 
+                title="Download PDF Invoice"
+                onclick={(e) => { 
+                  e.stopPropagation(); 
+                  const base = $page.url.port === '5173' ? 'http://localhost:8080' : '';
+                  window.open(`${base}/api/admin/bills/${b.id}/download`); 
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </button>
-            {/if}
+            </div>
           </td>
         </tr>
         {/each}
@@ -799,6 +830,14 @@
   </div>
   {/if}
 </div>
+
+{#if selectedBill}
+  <BillDrilldown 
+    billId={selectedBill.id} 
+    userId={selectedBill.user_account_id} 
+    onClose={() => selectedBill = null} 
+  />
+{/if}
 
 <style>
   .stats-grid {
@@ -866,6 +905,10 @@
     color: white;
   }
 
+  .clickable-row { cursor: pointer; transition: all 0.2s; }
+  .clickable-row:hover { background: rgba(224, 8, 0, 0.05); }
+  .clickable-row:active { background: rgba(224, 8, 0, 0.1); }
+  
   .customer-cell { display: flex; flex-direction: column; }
   .customer-cell .name { font-weight: 600; font-size: 0.95rem; }
   .customer-cell .msisdn { font-size: 0.8rem; }
@@ -1038,5 +1081,43 @@
     font-weight: 800;
     cursor: pointer;
     padding: 0;
+  }
+
+  /* ── Elite Precision Breakdown ── */
+  .text-right { text-align: right; }
+  .financial-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.72rem;
+    min-width: 150px;
+    padding: 4px 0;
+  }
+  .financial-breakdown .line {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+  .financial-breakdown .label {
+    opacity: 0.6;
+    white-space: nowrap;
+    text-align: left;
+  }
+  .financial-breakdown .value {
+    text-align: right;
+    font-weight: 500;
+    font-family: var(--font-mono);
+  }
+  .financial-breakdown .line.text-gold {
+    color: #ffd700;
+    font-weight: bold;
+  }
+  .financial-breakdown .separator {
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 4px 0;
   }
 </style>

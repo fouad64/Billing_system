@@ -173,6 +173,7 @@
         const custRes = await fetch('/api/admin/customers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
             name: newCustName,
             email: newCustEmail,
@@ -270,8 +271,8 @@
                   </span>
                 </td>
                 <td>
-                  <span class="amount-num" style={(c.available_credit || c.availableCredit) < 0 ? 'color: #ef4444' : ''}>
-                    {c.available_credit || c.availableCredit} EGP
+                  <span class="amount-num" style={(c.available_credit !== undefined && c.available_credit !== null && c.available_credit < 0) ? 'color: #ef4444' : ''}>
+                    {(c.available_credit !== undefined && c.available_credit !== null) ? `${c.available_credit} EGP` : '0 EGP'}
                   </span>
                 </td>
               </tr>

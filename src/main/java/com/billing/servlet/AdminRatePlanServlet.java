@@ -54,14 +54,17 @@ public class AdminRatePlanServlet extends BaseServlet {
             Number rorSms = (Number) body.get("ror_sms");
             Number price = (Number) body.get("price");
 
+            String type = (String) body.get("type");
+
             List<Map<String, Object>> result = DB.executeSelect(
-                "SELECT * FROM create_rateplan_with_packages(?, ?::numeric, ?::numeric, ?::numeric, ?::numeric, ?)",
+                "SELECT * FROM create_rateplan_with_packages(?, ?::numeric, ?::numeric, ?::numeric, ?::numeric, ?, ?::billing_type)",
                 name, 
                 rorVoice != null ? rorVoice.doubleValue() : 0, 
                 rorData != null ? rorData.doubleValue() : 0, 
                 rorSms != null ? rorSms.doubleValue() : 0, 
                 price != null ? price.doubleValue() : 0, 
-                DB.createSqlArray("integer", packageIds)
+                DB.createSqlArray("integer", packageIds),
+                type != null ? type : "POSTPAID"
             );
 
             res.setStatus(201);
@@ -93,14 +96,17 @@ public class AdminRatePlanServlet extends BaseServlet {
             Number rorSms = (Number) body.get("ror_sms");
             Number price = (Number) body.get("price");
 
+            String type = (String) body.get("type");
+
             DB.executeSelect(
-                "SELECT update_rateplan(?, ?, ?::numeric, ?::numeric, ?::numeric, ?::numeric, ?)",
+                "SELECT update_rateplan(?, ?, ?::numeric, ?::numeric, ?::numeric, ?::numeric, ?, ?::billing_type)",
                 id, name, 
                 rorVoice != null ? rorVoice.doubleValue() : null, 
                 rorData != null ? rorData.doubleValue() : null, 
                 rorSms != null ? rorSms.doubleValue() : null, 
                 price != null ? price.doubleValue() : null, 
-                sqlArray
+                sqlArray,
+                type
             );
 
             return Map.of("message", "Rate plan updated successfully");

@@ -21,24 +21,32 @@
   let displayUnit = $state('');
 
   function formatUsage(value, type) {
-    if (!value) return '0';
+    if (!value && value !== 0) return '0';
     const t = String(type || '').toLowerCase();
+    
+    // Smart formatting for Voice (Seconds to Minutes)
     if (t === 'voice') {
       if (value >= 60) return (value / 60).toFixed(1) + ' min';
       return value + ' sec';
     }
-    if (t === 'data') {
+    
+    // Smart formatting for Data/Free Units (Bytes to GB/MB)
+    if (t === 'data' || t === 'free_units' || value > 1000000) {
       if (value >= 1073741824) return (value / 1073741824).toFixed(2) + ' GB';
       if (value >= 1048576) return (value / 1048576).toFixed(1) + ' MB';
-      return (value / 1024).toFixed(1) + ' KB';
+      if (value >= 1024) return (value / 1024).toFixed(1) + ' KB';
+      return value + ' B';
     }
+
+    if (t === 'sms') return value + ' SMS';
+    
     return value;
   }
 
   async function fetchPackages() {
     loading = true;
     try {
-      const res = await fetch('/api/admin/service-packages');
+      const res = await fetch('/api/admin/service-packages', { credentials: 'include' });
       if (res.ok) {
         packages = await res.json();
       }
@@ -114,6 +122,7 @@
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(currentPkg)
       });
       if (res.ok) {
@@ -132,7 +141,10 @@
   async function deletePackage(id) {
     if (!confirm('Are you sure you want to delete this package?')) return;
     try {
-      const res = await fetch(`/api/admin/service-packages/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/service-packages/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include'
+      });
       if (res.ok) {
         showToast('Package deleted successfully');
         fetchPackages();
@@ -163,48 +175,70 @@
   {#if loading}
     <div class="loading-state">
       <div class="spinner"></div>
-      <span>Loading packages...</span>
+      <p>Synchronizing Portfolio...</p>
     </div>
   {:else}
-    <div class="grid-table card animate-fade">
-      <div class="table-header">
-        <div class="col">Name</div>
-        <div class="col">Type</div>
-        <div class="col">Amount</div>
-        <div class="col">Price</div>
-        <div class="col">Priority</div>
-        <div class="col">Roaming</div>
-        <div class="col actions">Actions</div>
-      </div>
-      <div class="table-body">
-        {#each packages as pkg}
-          <div class="table-row">
-            <div class="col name-col">
-              <strong>{pkg.name}</strong>
-              <small>{pkg.description || 'No description'}</small>
-            </div>
-            <div class="col">
-              <span class="badge badge-{pkg.type}">{pkg.type}</span>
-            </div>
-            <div class="col font-mono">{formatUsage(pkg.amount, pkg.type)}</div>
-            <div class="col font-mono">EGP {pkg.price}</div>
-            <div class="col">{pkg.priority}</div>
-            <div class="col">
-              <span class="roaming-status {pkg.is_roaming ? 'is-roaming' : ''}">
-                {pkg.is_roaming ? 'Yes' : 'No'}
-              </span>
-            </div>
-            <div class="col actions">
-              <button class="icon-btn edit" onclick={() => openEditModal(pkg)} title="Edit">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-              </button>
-              <button class="icon-btn delete" onclick={() => deletePackage(pkg.id)} title="Delete">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-              </button>
-            </div>
-          </div>
-        {/each}
-      </div>
+    <div class="table-wrapper animate-fade">
+      <table class="pkg-table">
+        <thead>
+          <tr>
+            <th>Service Package</th>
+            <th>Type</th>
+            <th>Quota Amount</th>
+            <th>Base Price</th>
+            <th>Priority</th>
+            <th>Roaming</th>
+            <th style="text-align: right;">System Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each packages as pkg}
+            <tr class="pkg-row">
+              <td>
+                <div class="name-cell">
+                  <div class="accent-bar accent-{pkg.type.toLowerCase() === 'data' ? 'data' : pkg.type.toLowerCase() === 'voice' ? 'voice' : pkg.type.toLowerCase() === 'sms' ? 'sms' : 'free'}"></div>
+                  <div class="name-info">
+                    <div class="pkg-name">{pkg.name}</div>
+                    <div class="pkg-desc">{pkg.description || 'Enterprise-grade service bundle'}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-{pkg.type.toLowerCase()}">{pkg.type}</span>
+              </td>
+              <td>
+                <div class="data-chip {pkg.type.toLowerCase() === 'data' ? 'data-chip-variant' : pkg.type.toLowerCase() === 'voice' ? 'voice-chip' : pkg.type.toLowerCase() === 'sms' ? 'sms-chip' : 'free-chip'}">
+                  <span class="chip-val">{formatUsage(pkg.amount, pkg.type).split(' ')[0]}</span>
+                  <span class="chip-unit">{formatUsage(pkg.amount, pkg.type).split(' ')[1] || ''}</span>
+                </div>
+              </td>
+              <td>
+                <div class="price-pill">
+                  <span class="currency">EGP</span>{pkg.price}
+                </div>
+              </td>
+              <td>
+                <div class="id-badge">{pkg.priority}</div>
+              </td>
+              <td>
+                <span class="roaming-status" class:is-roaming={pkg.is_roaming}>
+                  {pkg.is_roaming ? 'Active' : 'No'}
+                </span>
+              </td>
+              <td style="text-align: right;">
+                <div class="actions">
+                  <button class="icon-btn edit" onclick={() => openEditModal(pkg)} title="Modify Configuration">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button class="icon-btn delete" onclick={() => deletePackage(pkg.id)} title="Decommission Package">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     </div>
   {/if}
 </div>
@@ -282,27 +316,105 @@
 
 <style>
   .text-gradient { background: linear-gradient(135deg, var(--red), var(--red-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-  .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5rem; }
-  .page-subtitle { color: var(--text-muted); font-size: 1.1rem; margin-top: 0.5rem; }
-  .grid-table { background: rgba(15, 15, 25, 0.4); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
-  .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr 0.8fr 120px; background: rgba(255, 255, 255, 0.03); padding: 1.25rem 2rem; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
-  .table-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr 0.8fr 120px; padding: 1.25rem 2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.03); align-items: center; transition: background 0.2s; }
+  .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem; }
+  .page-subtitle { color: var(--text-muted); font-size: 1rem; margin-top: 0.25rem; }
+  .grid-table { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; max-width: 1600px; width: 100%; margin: 0 auto; }
+  .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr 0.8fr 120px; background: rgba(255, 255, 255, 0.03); padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }
+  .table-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr 0.8fr 120px; padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.03); align-items: center; transition: background 0.2s; }
   .table-row:hover { background: rgba(255, 255, 255, 0.02); }
-  .table-row:last-child { border-bottom: none; }
-  .name-col { display: flex; flex-direction: column; gap: 0.25rem; }
-  .name-col strong { color: white; font-size: 1.05rem; }
-  .name-col small { color: var(--text-muted); font-size: 0.85rem; }
-  .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; border: 1px solid transparent; }
-  .badge-voice { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: rgba(59, 130, 246, 0.2); }
-  .badge-data { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
-  .badge-sms { background: rgba(139, 92, 246, 0.1); color: #a78bfa; border-color: rgba(139, 92, 246, 0.2); }
-  .roaming-status { font-size: 0.85rem; color: var(--text-muted); }
-  .roaming-status.is-roaming { color: #F59E0B; font-weight: 700; }
+  
+  .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; border: 1px solid transparent; }  /* Elite Refinement Styles */
+  .pkg-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: 1rem; }
+  .pkg-table th { padding: 12px 20px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 800; border: none; }
+  
+  .pkg-row { 
+    background: rgba(255, 255, 255, 0.02); 
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  
+  .pkg-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: scale(1.002) translateX(4px);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  }
+  
+  .pkg-row td { padding: 12px 20px; border: none; vertical-align: middle; }
+  .pkg-row td:first-child { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+  .pkg-row td:last-child { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+
+  /* Service Type Accent Bars */
+  .accent-bar { width: 4px; height: 32px; border-radius: 2px; margin-right: 12px; }
+  .accent-voice { background: #3b82f6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+  .accent-data { background: #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
+  .accent-sms { background: #8b5cf6; box-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }
+  .accent-free { background: #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+
+  .name-cell { display: flex; align-items: center; }
+  .pkg-name { font-weight: 800; font-size: 1rem; color: white; margin-bottom: 2px; }
+  .pkg-desc { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+
+  /* Precision Data Chips */
+  .data-chip {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+    height: 36px;
+  }
+  .chip-val { 
+    padding: 0 12px; 
+    font-family: 'JetBrains Mono', monospace; 
+    font-weight: 900; 
+    font-size: 0.95rem; 
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+  .chip-unit { 
+    padding: 0 10px; 
+    background: rgba(255, 255, 255, 0.05); 
+    font-size: 0.6rem; 
+    font-weight: 800; 
+    color: var(--text-muted); 
+    text-transform: uppercase;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .voice-chip { color: #60a5fa; border-color: rgba(96, 165, 250, 0.2); }
+  .data-chip-variant { color: #34d399; border-color: rgba(52, 211, 153, 0.2); }
+  .sms-chip { color: #a78bfa; border-color: rgba(167, 139, 250, 0.2); }
+  .free-chip { color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
+
+  .price-pill {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    color: white;
+    font-size: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .currency { font-size: 0.65rem; color: var(--text-muted); margin-right: 4px; }
   .actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
   .icon-btn { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-muted); padding: 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
   .icon-btn:hover { color: white; background: rgba(255, 255, 255, 0.1); transform: scale(1.1); }
   .icon-btn.edit:hover { border-color: #3B82F6; color: #3B82F6; }
   .icon-btn.delete:hover { border-color: var(--red); color: var(--red); }
+  
+  .badge-voice { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: rgba(59, 130, 246, 0.2); }
+  .badge-data { background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.2); }
+  .badge-sms { background: rgba(139, 92, 246, 0.1); color: #a78bfa; border-color: rgba(139, 92, 246, 0.2); }
+  .badge-free_units { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
+
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem; }
   .form-group.full { grid-column: span 2; }
   .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.9rem; color: var(--text-muted); }

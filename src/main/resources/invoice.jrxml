@@ -5,15 +5,18 @@
 	<dataset name="usageBreakdown">
 		<parameter name="BILL_ID" class="java.lang.Integer"/>
 		<query language="SQL"><![CDATA[
-			SELECT service_type, category_label, quota, consumed, unit_rate, line_total,
-				   is_roaming, is_promotional, notes
+			SELECT service_type, category_label, quota_raw, consumed_raw, quota_display, consumed_display, 
+				   unit_label, unit_rate, line_total, is_roaming, is_promotional, notes
 			FROM get_bill_usage_breakdown($P{BILL_ID})
 			ORDER BY service_type, is_roaming DESC, category_label
 		]]></query>
 		<field name="service_type" class="java.lang.String"/>
 		<field name="category_label" class="java.lang.String"/>
-		<field name="quota" class="java.lang.Long"/>
-		<field name="consumed" class="java.lang.Long"/>
+		<field name="quota_raw" class="java.lang.Long"/>
+		<field name="consumed_raw" class="java.lang.Long"/>
+		<field name="quota_display" class="java.math.BigDecimal"/>
+		<field name="consumed_display" class="java.math.BigDecimal"/>
+		<field name="unit_label" class="java.lang.String"/>
 		<field name="unit_rate" class="java.math.BigDecimal"/>
 		<field name="line_total" class="java.math.BigDecimal"/>
 		<field name="is_roaming" class="java.lang.Boolean"/>
@@ -36,7 +39,8 @@
 		SELECT 
 			ua.name AS customer_name, ua.email AS customer_email,
 			COALESCE(ua.address, 'N/A') AS customer_address, ua.id AS customer_id,
-			b.billing_period_start, b.billing_period_end, b.billing_date, b.due_date,
+			b.billing_period_start, b.billing_period_end, b.billing_date,
+			(b.billing_date + interval '15 days')::date AS due_date,
 			COALESCE(b.recurring_fees, 0) AS recurring_fees,
 			COALESCE(b.one_time_fees, 0) AS one_time_fees,
 			COALESCE(b.voice_usage, 0) AS voice_usage,
@@ -243,7 +247,7 @@
 						</columnHeader>
 						<detailCell style="Table_Cell" height="15">
 							<element kind="textField" x="0" y="0" width="70" height="15" forecolor="#E0E0E0" fontSize="8.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[$F{quota} == null ? "—" : ($F{service_type}.matches(".*data.*") || $F{service_type}.equals("free_units")) ? new java.text.DecimalFormat("#,##0").format($F{quota} / 1073741824.0) + " GB" : ($F{service_type}.matches(".*voice.*") ? new java.text.DecimalFormat("#,##0").format($F{quota} / 60.0) + " min" : $F{quota} + " units")]]></expression>
+								<expression><![CDATA[$F{quota_display} == null ? "—" : new java.text.DecimalFormat("#,##0.##").format($F{quota_display}) + " " + $F{unit_label}]]></expression>
 							</element>
 						</detailCell>
 					</column>
@@ -255,7 +259,7 @@
 						</columnHeader>
 						<detailCell style="Table_Cell" height="15">
 							<element kind="textField" x="0" y="0" width="80" height="15" forecolor="#E0E0E0" fontSize="8.0" hTextAlign="Center" vTextAlign="Middle" blankWhenNull="true">
-								<expression><![CDATA[$F{consumed} == null ? "0" : ($F{service_type}.matches(".*data.*") || $F{service_type}.equals("free_units")) ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 1073741824.0) + " GB" : ($F{service_type}.matches(".*voice.*") ? new java.text.DecimalFormat("#,##0.00").format($F{consumed} / 60.0) + " min" : ($F{service_type}.equals("fee") ? $F{consumed} + " unit" : $F{consumed} + " msgs")) ]]></expression>
+								<expression><![CDATA[$F{consumed_display} == null ? "0" : new java.text.DecimalFormat("#,##0.##").format($F{consumed_display}) + " " + $F{unit_label}]]></expression>
 							</element>
 						</detailCell>
 					</column>

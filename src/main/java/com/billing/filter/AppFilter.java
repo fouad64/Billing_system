@@ -11,7 +11,6 @@ import java.util.Optional;
 /**
  * High-Performance Unified App Filter
  */
-@WebFilter(urlPatterns = "/*")
 public class AppFilter implements Filter {
 
     private String cachedCssTag = null;
@@ -44,25 +43,18 @@ public class AppFilter implements Filter {
         // Normalization
         if (path.length() > 1 && path.endsWith("/")) path = path.substring(0, path.length() - 1);
 
-        // Security Guard: Strict Role-Based Authorization
+        // Security Guard: Protect APIs but let Svelte handle UI routing
         jakarta.servlet.http.HttpSession session = req.getSession(false);
         java.util.Map<String, Object> user = (session != null) ? (java.util.Map<String, Object>) session.getAttribute("user") : null;
 
-        if (path.startsWith("/admin") || path.startsWith("/api/admin")) {
-            if (user == null) {
-                if (path.startsWith("/api/")) res.sendError(401, "Authentication required");
-                else res.sendRedirect(req.getContextPath() + "/login");
+        if (path.startsWith("/api/admin")) {
+            if (user == null || !"admin".equals(user.get("role"))) {
+                res.sendError(401, "Admin API access required");
                 return;
             }
-            if (!"admin".equals(user.get("role"))) {
-                if (path.startsWith("/api/")) res.sendError(403, "Admin role required");
-                else res.sendRedirect(req.getContextPath() + "/dashboard");
-                return;
-            }
-        } else if (path.startsWith("/profile") || path.startsWith("/api/customer")) {
+        } else if (path.startsWith("/api/customer")) {
             if (user == null) {
-                if (path.startsWith("/api/")) res.sendError(401, "Authentication required");
-                else res.sendRedirect(req.getContextPath() + "/login");
+                res.sendError(401, "Customer API access required");
                 return;
             }
         }
@@ -78,7 +70,8 @@ public class AppFilter implements Filter {
         } else if (isRoot) {
             handleHtmlInjection(req, res, chain);
         } else {
-            // SPA Deep Links (e.g. /dashboard)
+            // SPA Deep Links (e.g. /admin, /profile, /packages)
+            // Forward to index.html and let SvelteKit's client-side router + security handles it.
             request.getRequestDispatcher("/index.html").forward(request, response);
         }
     }
@@ -121,21 +114,20 @@ public class AppFilter implements Filter {
         long currentDiskTime = 0;
         
         if (assetPath != null) {
-            // Check filesystem if available (IDE mode)
             File assetDir = new File(assetPath);
             currentDiskTime = assetDir.lastModified();
         }
 
-        // Use cache if assets haven't changed (Standard Performance Optimization)
         if (cachedCssTag != null && (assetPath == null || lastBuildTime >= currentDiskTime)) {
             return cachedCssTag;
         }
         
-        // SCANNING: Search for the CSS file inside the webapp (Works in both IDE and JAR)
+        System.out.println("[AppFilter] Scanning for CSS assets in /_app/immutable/assets/...");
         java.util.Set<String> assets = context.getResourcePaths("/_app/immutable/assets/");
-        if (assets == null || assets.isEmpty()) return "";
-
-        // ... rest of the method
+        if (assets == null || assets.isEmpty()) {
+            System.err.println("[AppFilter] WARNING: No assets found in /_app/immutable/assets/");
+            return "";
+        }
 
         Optional<String> cssFile = assets.stream()
                 .map(p -> p.substring(p.lastIndexOf("/") + 1))
@@ -145,7 +137,10 @@ public class AppFilter implements Filter {
 
         if (cssFile.isPresent()) {
             cachedCssTag = "<link rel=\"stylesheet\" href=\"/_app/immutable/assets/" + cssFile.get() + "\">";
-            lastBuildTime = currentDiskTime; // Lock to current disk state
+            lastBuildTime = currentDiskTime;
+            System.out.println("[AppFilter] Found CSS: " + cachedCssTag);
+        } else {
+            System.err.println("[AppFilter] WARNING: No .css file found in assets.");
         }
         
         return cachedCssTag != null ? cachedCssTag : "";

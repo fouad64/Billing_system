@@ -16,9 +16,27 @@
 
 	// Global Security Guard
 	$effect(() => {
-		if (authState.initialized && $page.url.pathname.startsWith('/admin')) {
-			if (!authState.user || authState.user.role !== 'admin') {
-				window.location.href = `/login?returnTo=${$page.url.pathname}`;
+		if (authState.initialized) {
+			const path = $page.url.pathname;
+			const user = authState.user;
+
+			// 1. Protect Admin Routes
+			if (path.startsWith('/admin')) {
+				if (!user || user.role !== 'admin') {
+					window.location.href = `/login?returnTo=${path}`;
+				}
+			} 
+			// 2. Protect Customer Routes
+			else if (path.startsWith('/profile') || path.startsWith('/onboarding')) {
+				if (!user) {
+					window.location.href = `/login?returnTo=${path}`;
+				}
+			}
+			// 3. Prevent Logged-in Users from visiting Login/Register
+			else if (path === '/login' || path === '/register') {
+				if (user) {
+					window.location.href = user.role === 'admin' ? '/admin' : '/profile';
+				}
 			}
 		}
 	});

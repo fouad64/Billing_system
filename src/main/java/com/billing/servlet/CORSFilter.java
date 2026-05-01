@@ -15,9 +15,16 @@ public class CORSFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
         
-        response.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
+        String origin = request.getHeader("Origin");
+        if (origin != null && (origin.contains("localhost") || origin.contains("railway.app"))) {
+            response.setHeader("Access-Control-Allow-Origin", origin);
+        } else if (origin == null) {
+            // No origin header means it's likely a same-origin request
+            // We can still set it for safety if needed, but usually same-origin is fine
+        }
+        
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
         response.setHeader("Access-Control-Allow-Credentials", "true");
         
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
